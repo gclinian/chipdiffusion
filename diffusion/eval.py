@@ -206,14 +206,29 @@ def main(cfg):
     print("generating output samples")
     output_metrics = {}
     log_metrics = common.Metrics()
-    for i in range(cfg.num_output_samples):
+    start_sample = cfg.get("start_sample", 0)
+    skip_guidance_threshold = cfg.get("skip_guidance_threshold", 0)  # 0 = never skip
+    for i in range(start_sample, cfg.num_output_samples):
         x, cond = val_set[i]
+        # Temporarily disable guidance for large circuits to avoid OOM
+        if skip_guidance_threshold > 0 and cfg.macros_only:
+            num_macros = cond.is_macros.sum().item() if hasattr(cond, 'is_macros') else x.shape[0]
+            if num_macros > skip_guidance_threshold:
+                print(f"Sample {i}: {num_macros} macros > threshold {skip_guidance_threshold}, disabling guidance")
+                original_guidance_mode = model.guidance_mode
+                original_is_guided = model.is_guided_sampling
+                model.guidance_mode = "none"
+                model.is_guided_sampling = False
+            else:
+                original_guidance_mode = None
+        else:
+            original_guidance_mode = None
         metrics, metrics_special, image, image_legalized = utils.save_outputs(
-            x, 
-            cond, 
-            model, 
-            save_folder=sample_dir, 
-            output_number_offset=0, 
+            x,
+            cond,
+            model,
+            save_folder=sample_dir,
+            output_number_offset=0,
             policy=cfg.eval_policy_algorithm,
             policy_kwargs=cfg.eval_policy,
             preprocess_fn=preprocess_fn,
@@ -221,6 +236,10 @@ def main(cfg):
             legalization_fn=legalize_fn,
         )
         print(f"Finished sample {i+1} of {cfg.num_output_samples} \t {metrics}")
+        # Restore guidance mode if it was disabled
+        if original_guidance_mode is not None:
+            model.guidance_mode = original_guidance_mode
+            model.is_guided_sampling = original_is_guided
         t5 = time.time()
         # additional metrics
         eig_vals = analysis_utils.get_spectral_info(x, cond, k=1)
