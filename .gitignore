@@ -11,3 +11,7 @@ data-gen/outputs/
 shmetis
 hmetis
 benchmarks/
+*.tar.gz
+*.tar.xz
+hmetis-1.5-linux/
+condaenv.*.requirements.txt

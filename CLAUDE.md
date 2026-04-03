@@ -7,7 +7,7 @@
 - This ensures continuity across sessions — the user should never have to re-explain progress.
 
 ## Project: chipdiffusion
-- Conda environment: `chipdiffusion` (from `environment.yaml`)
+- Conda environment: `chipdiff` (created from `environment.yaml`; server has only one GPU, no need for `CUDA_VISIBLE_DEVICES`)
 - All commands should be run with `PYTHONPATH=.` prefix from the project root
 - Generated data goes to `data-gen/outputs/`
 - Pre-trained model checkpoint at `logs/public-models/large-v2/large-v2.ckpt`
@@ -26,7 +26,7 @@
 - **generate_parallel.py num_workers**: Default is 64, which can OOM and kill SSH. Use fewer workers (e.g., 4) or use `generate.py` for single-process.
 - **`placements/macro-ispd/`**: These results are from the **paper authors** (checkpoint `v2_gmix1.6_2x...ckpt`), NOT from our runs. They match paper Table 10 exactly.
 
-## Verification Progress (as of 2026-03-31)
+## Verification Progress (as of 2026-04-01)
 
 ### Goal
 Verify chipdiffusion paper (arxiv 2407.12282) reported performance on real benchmarks.
@@ -36,23 +36,33 @@ Verify chipdiffusion paper (arxiv 2407.12282) reported performance on real bench
 2. IBM benchmark downloaded & parsed — `datasets/graph/ibm.cluster512.v1/` and `ibm.cluster0.v1/` (18 circuits each)
 3. ISPD2005 benchmark downloaded & parsed — `datasets/graph/ispd2005-s0/` (8 circuits)
 4. hmetis installed — `hmetis-1.5-linux/` in repo root
-5. ISPD2005 macro-only eval for bigblue3 & bigblue4 — completed with metrics
+5. ISPD2005 macro-only eval — **completed** for 7/8 circuits (samples 0-4, 6-7). Merged metrics in `logs/diffusion_debug/ispd2005-s0.eval_macro_only.300/metrics.csv`
 
-### ISPD2005 Results (our runs vs paper, seed=300 vs paper seed=400)
+### ISPD2005 Results (our runs vs paper, seed=300 vs paper seed=400, HPWL x10^5)
 
-| Circuit  | Paper HPWL | Ours HPWL | Paper Legality | Ours Legality | Paper Ratio | Ours Ratio |
-|----------|-----------|-----------|----------------|---------------|-------------|------------|
-| bigblue3 | 3591.4    | 3426.2    | 0.9960         | 0.9951        | 0.6270      | 0.5981     |
-| bigblue4 | 14057.1   | 13195.6   | 0.9909         | 0.9914        | 0.5234      | 0.4914     |
+| idx | Circuit  | Ours HPWL | Paper HPWL | Ours Legality | Ours Ratio | Note |
+|-----|----------|-----------|------------|---------------|------------|------|
+| 0   | adaptec1 | 10.22     | 9.19       | 0.9942        | 0.718      |      |
+| 1   | adaptec2 | 39.06     | 31.0       | 0.9305        | 1.056      | legality low |
+| 2   | adaptec3 | 62.14     | 54.4       | 0.9943        | 0.798      |      |
+| 3   | adaptec4 | 60.51     | 54.5       | 0.9965        | 0.679      |      |
+| 4   | bigblue1 | 2.69      | 2.64       | 0.9963        | 0.822      | very close |
+| 5   | bigblue2 | skipped   | 38.8       | -             | -          | OOM (23k macros) |
+| 6   | bigblue3 | 34.26     | 35.9       | 0.9951        | 0.598      | better than paper |
+| 7   | bigblue4 | 131.96    | 140.6      | 0.9914        | 0.491      | better than paper |
 
-Our results slightly better than paper (different seed). Results stored in `logs/diffusion_debug/ispd2005-s0.eval_macro_only.300/metrics.csv` (only has sample 6-7).
+Detailed comparison saved in `logs/diffusion_debug/ispd2005-s0.eval_macro_only.300/comparison_with_paper.csv`.
+
+### Differences from Paper's Eval Process
+- **Seed**: ours=300, paper=400 — likely source of per-circuit variation
+- **Guidance**: all 7 circuits had guidance **enabled** (skip_guidance_threshold=10000 was not triggered for any circuit we ran). Same as paper.
+- **bigblue2 skipped**: paper ran it (likely with >24GB GPU), we OOM on both guidance and legalization
+- **Hyperparameters**: identical to paper (guidance steps=20, legalization steps=20000, etc.)
+- **Checkpoint**: same pre-trained `large-v2.ckpt`
 
 ### In Progress / Not Done
-- Samples 0-4 (adaptec1-4, bigblue1): rerunning to get metrics
-- bigblue2: skipped (23k macros, OOM on 24GB GPU — both guidance and legalization fail)
 - v2 data not generated
 - IBM eval not run yet
-- Need to merge metrics from separate runs (samples 0-4 and samples 6-7)
 
 ### ISPD2005 Macro Counts
 | idx | Circuit  | Macros | Runnable on 24GB? |
@@ -70,7 +80,7 @@ Our results slightly better than paper (different seed). Results stored in `logs
 
 ### ISPD2005 macro-only eval
 ```bash
-CUDA_VISIBLE_DEVICES=<GPU> PYTHONPATH=. python diffusion/eval.py \
+PYTHONPATH=. python diffusion/eval.py \
   method=eval_macro_only \
   task=ispd2005-s0 \
   from_checkpoint=logs/public-models/large-v2/large-v2.ckpt \
@@ -91,7 +101,7 @@ CUDA_VISIBLE_DEVICES=<GPU> PYTHONPATH=. python diffusion/eval.py \
 
 ### IBM clustered eval
 ```bash
-CUDA_VISIBLE_DEVICES=<GPU> PYTHONPATH=. python diffusion/eval.py \
+PYTHONPATH=. python diffusion/eval.py \
   method=eval_guided \
   task=ibm.cluster512.v1 \
   from_checkpoint=logs/public-models/large-v2/large-v2.ckpt \

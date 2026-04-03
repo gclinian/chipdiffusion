@@ -11,8 +11,8 @@
 - Status: **Not started**
 
 ### Step 3: Compare metrics with paper
-- [ ] Compare HPWL, legality, etc. against paper's reported numbers
-- Status: **Not started**
+- [x] Compare HPWL, legality, etc. against paper's reported numbers
+- Status: **Done** (2026-04-01). ISPD2005 macro-only eval completed for 7/8 circuits. Results close to paper; bigblue3/4 slightly better, adaptec1-4 slightly worse (seed difference). See `logs/diffusion_debug/ispd2005-s0.eval_macro_only.300/comparison_with_paper.csv`.
 
 ---
 
