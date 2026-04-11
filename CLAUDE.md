@@ -6,9 +6,20 @@
 - If a task fails or is interrupted, note the error/status in `PROGRESS.md`.
 - This ensures continuity across sessions — the user should never have to re-explain progress.
 
+## Documentation Rules
+- 所有文件統一放在 `docs/` 下
+- **實驗報告**：`docs/report/<name>_report_<N>.md`（例如 `ddpo_report_1.md`）
+- **計畫文件**：`docs/plan/<name>_plan_<N>.md`（例如 `ddpo_plan_1.md`）
+- **回顧筆記**：`docs/next/<name>_next_<N>.md`（例如 `ddpo_next_1.md`），記錄實驗的失敗原因、教訓、下次改進方向
+- **會議記錄**：`docs/meet/meet_<MMDD>.md`（例如 `meet_0403.md`），記錄教授建議
+- 流程：`plan_N` → 執行實驗 → `report_N` → `next_N`（回顧）→ `plan_N+1`（參考 `next_N`）
+- 每次實驗結束或有階段性結果時，更新對應的 `_report_N.md`
+- 新實驗開始前，先參考 `_next_N-1.md`，再建立 `_plan_N.md`
+
 ## Project: chipdiffusion
 - Conda environment: `chipdiff` (created from `environment.yaml`; server has only one GPU, no need for `CUDA_VISIBLE_DEVICES`)
 - All commands should be run with `PYTHONPATH=.` prefix from the project root
+- **長時間實驗**（training, eval 等）必須用 tmux 執行，防止斷線中斷。用 `tmux new-session -d -s <name>` 建立 session，再用 `tmux send-keys -t <name> "command" Enter` 送指令。不要用 `tmux new-session -d -s <name> "command"` 的方式，因為指令結束後 session 會自動消失。
 - Generated data goes to `data-gen/outputs/`
 - Pre-trained model checkpoint at `logs/public-models/large-v2/large-v2.ckpt`
 

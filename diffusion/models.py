@@ -1397,7 +1397,7 @@ class ContinuousDiffusionModel(nn.Module):
         
         return intermediates
 
-    def reverse_samples(self, B, x_in, cond, num_timesteps=-1, intermediate_every = 0, mask_override = None):
+    def reverse_samples(self, B, x_in, cond, num_timesteps=-1, intermediate_every = 0, mask_override = None, output_log_prob = False):
         # B: batch size
         # intermediate_every: determines how often intermediate diffusion steps are saved and returned. 0 = no intermediates returned
         batch_shape = (B, cond.x.shape[0], self.input_shape[1])
@@ -1415,11 +1415,15 @@ class ContinuousDiffusionModel(nn.Module):
         self._noise_scheduler.set_timesteps(num_timesteps)
         timesteps = self._noise_scheduler.timesteps
 
+        if output_log_prob:
+            log_probs = torch.zeros((len(timesteps) - 1, B,), device = x.device)
+            predicted_x0_list = []
+
         # reset guidance state (if exists)
         self.reset_guidance_state(dtype = x.dtype)
 
         for i, (t, t_minus_one) in enumerate(zip(timesteps[:-1], timesteps[1:])):
-            
+
             if self.is_guided_sampling:
                 if self.guidance_mode == "sgd":
                     guidance_fn = lambda x_hat: self.reverse_guidance_force(x_hat, cond, t, mask)
@@ -1432,22 +1436,48 @@ class ContinuousDiffusionModel(nn.Module):
 
             t_vec = torch.tensor(t, device=x.device).expand(B)
             eps_predict = self(x, cond, t_vec)
-        
+
             z = self._epsilon_dist.sample(batch_shape).squeeze(dim = -1) if i<(len(timesteps)-2) else torch.zeros_like(x)
-            x, x0_predicted = self._noise_scheduler.step(
-                eps_prediction = eps_predict,
-                t = t,
-                t_minus_one = t_minus_one,
-                xt = x,
-                z = z,
-                mask = mask,
-                guidance_fn = guidance_fn,
-            )
-            x = torch.clamp(x, -2, 2)
+
+            if output_log_prob:
+                # Compute mu (mean) and eta (noise scale) to get log probability
+                alpha_t = self._noise_scheduler.alpha(t)
+                alpha_t_minus_one = self._noise_scheduler.alpha(t_minus_one)
+                sigma_t = self._noise_scheduler.sigma(t)
+                sigma_t_minus_one = self._noise_scheduler.sigma(t_minus_one)
+                eta = self._noise_scheduler.eta(t, t_minus_one)
+
+                predicted_x0 = (x - sigma_t * eps_predict) / alpha_t
+                predicted_x0 = torch.where(mask, x, predicted_x0) if mask is not None else predicted_x0
+                predicted_x0_list.append(predicted_x0.detach())
+                x0_guided = predicted_x0 + (guidance_fn(predicted_x0) if guidance_fn is not None else 0)
+                xt_minus_one_direction = torch.sqrt(torch.clip(torch.square(sigma_t_minus_one) - torch.square(eta), min=0)) * eps_predict
+                mu = alpha_t_minus_one * x0_guided + xt_minus_one_direction
+
+                x = mu.detach() + eta * z
+                x = torch.where(mask, x_in, x) if mask is not None else x
+                x = torch.clamp(x, -2, 2)
+                log_probs[i, :] = pi_log_prob(x, mu, eta)
+            else:
+                x, x0_predicted = self._noise_scheduler.step(
+                    eps_prediction = eps_predict,
+                    t = t,
+                    t_minus_one = t_minus_one,
+                    xt = x,
+                    z = z,
+                    mask = mask,
+                    guidance_fn = guidance_fn,
+                )
+                x = torch.clamp(x, -2, 2)
+
             if intermediate_every and (i+1) % intermediate_every == 0:
                 intermediates.append(x)
-        return x, intermediates
-    
+
+        if output_log_prob:
+            return x, intermediates, log_probs, predicted_x0_list
+        else:
+            return x, intermediates
+
     def get_mask(self, x, cond):
         if self.mask_key and self.mask_key in cond:
             mask = cond[self.mask_key]

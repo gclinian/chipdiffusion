@@ -6,6 +6,11 @@ eval_every: 5000
 val_batch_size: 64 
 lr: 1e-4
 ddpo:
-  legality_weight: 0.0
+  legality_weight: 0.5
   hpwl_weight: 1.0
   ema_factor: 0.999
+  num_timesteps: 50
+  clip_epsilon: 0.2
+  supervised_weight: 1.0
+  local_reward_weight: 0.5
+  local_reward_every: 5

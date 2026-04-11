@@ -64,10 +64,14 @@ def main(cfg):
     train_metrics = common.Metrics()
     if cfg.mode == "ddpo":
         ddpo_model = ddpo.DDPO(
-            model, 
-            ddpo.get_reward_fn(cfg.ddpo.legality_weight, cfg.ddpo.hpwl_weight), 
+            model,
+            ddpo.get_reward_fn(cfg.ddpo.legality_weight, cfg.ddpo.hpwl_weight),
             cfg.batch_size,
             cfg.ddpo.ema_factor,
+            num_timesteps=cfg.ddpo.get("num_timesteps", -1),
+            clip_epsilon=cfg.ddpo.get("clip_epsilon", 0.0),
+            local_reward_weight=cfg.ddpo.get("local_reward_weight", 0.0),
+            local_reward_every=cfg.ddpo.get("local_reward_every", 5),
             )
 
     # Prepare logger
@@ -108,7 +112,14 @@ def main(cfg):
         if cfg.mode != "ddpo":
             loss, model_metrics = model.loss(x, cond, t)
         else:
-            loss, model_metrics = ddpo_model.loss(x, cond)
+            ddpo_loss, model_metrics = ddpo_model.loss(x, cond)
+            supervised_weight = cfg.ddpo.get("supervised_weight", 0.0)
+            if supervised_weight > 0:
+                supervised_loss, _ = model.loss(x, cond, t)
+                loss = ddpo_loss + supervised_weight * supervised_loss
+                model_metrics["supervised_loss"] = supervised_loss.detach().cpu().item()
+            else:
+                loss = ddpo_loss
 
         grad_scaler.scale(loss).backward()
         grad_scaler.step(optim)
