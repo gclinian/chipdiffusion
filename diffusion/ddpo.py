@@ -3,7 +3,7 @@ import guidance
 
 class DDPO():
     
-    def __init__(self, model, reward_fn, batch_size, ema_factor=0.99, warmup_size=200, num_timesteps=-1, clip_epsilon=0.0, local_reward_weight=0.0, local_reward_every=1):
+    def __init__(self, model, reward_fn, batch_size, ema_factor=0.99, warmup_size=200, num_timesteps=-1, clip_epsilon=0.0, local_reward_weight=0.0, local_reward_every=1, local_reward_last_k=0):
         """
         model: nn.Module with reverse_samples() function that can output log probs
         reward_fn: callable
@@ -12,15 +12,17 @@ class DDPO():
         clip_epsilon: PPO clipping range (0 = no clipping, use REINFORCE)
         local_reward_weight: weight for per-step local reward (0 = disabled)
         local_reward_every: compute local reward every N steps (to save compute)
+        local_reward_last_k: only compute local reward for last K timesteps (0 = all timesteps)
         """
         self.model = model
         self.reward_fn = reward_fn
-        self.local_reward_fn = get_reward_fn(0.0, 1.0)  # local reward = HPWL only (no V×V legality)
+        self.local_reward_fn = reward_fn  # local reward uses same composition as global (HPWL + legality)
         self.batch_size = batch_size
         self.num_timesteps = num_timesteps
         self.clip_epsilon = clip_epsilon
         self.local_reward_weight = local_reward_weight
         self.local_reward_every = local_reward_every
+        self.local_reward_last_k = local_reward_last_k
 
         self.ema_factor = ema_factor
         self.warmup_size = warmup_size
@@ -58,8 +60,9 @@ class DDPO():
         local_loss = torch.tensor(0.0, device=x.device)
         if self.local_reward_weight > 0 and len(predicted_x0_list) > 0:
             T = len(predicted_x0_list)
+            start_idx = max(0, T - self.local_reward_last_k) if self.local_reward_last_k > 0 else 0
             local_rewards = []
-            for t_idx in range(0, T, self.local_reward_every):
+            for t_idx in range(start_idx, T, self.local_reward_every):
                 local_r = self.local_reward_fn(predicted_x0_list[t_idx], cond).detach()  # (B,)
                 local_rewards.append(local_r)
             # Average local reward across sampled steps

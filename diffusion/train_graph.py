@@ -72,6 +72,7 @@ def main(cfg):
             clip_epsilon=cfg.ddpo.get("clip_epsilon", 0.0),
             local_reward_weight=cfg.ddpo.get("local_reward_weight", 0.0),
             local_reward_every=cfg.ddpo.get("local_reward_every", 5),
+            local_reward_last_k=cfg.ddpo.get("local_reward_last_k", 0),
             )
 
     # Prepare logger
@@ -110,7 +111,12 @@ def main(cfg):
         t = torch.randint(1, cfg.model.max_diffusion_steps + 1, [x.shape[0]], device = device)
         optim.zero_grad()
         if cfg.mode != "ddpo":
-            loss, model_metrics = model.loss(x, cond, t)
+            addloss = cfg.get("addloss", {}) or {}
+            loss, model_metrics = model.loss(
+                x, cond, t,
+                hpwl_weight=addloss.get("hpwl_weight", 0.0),
+                legality_weight=addloss.get("legality_weight", 0.0),
+            )
         else:
             ddpo_loss, model_metrics = ddpo_model.loss(x, cond)
             supervised_weight = cfg.ddpo.get("supervised_weight", 0.0)

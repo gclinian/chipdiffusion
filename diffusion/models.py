@@ -1360,11 +1360,11 @@ class ContinuousDiffusionModel(nn.Module):
         t_embed = self.t_encoder(t)
         return self._reverse_model(x, cond, t_embed).view(*x.shape)
     
-    def loss(self, x, cond, _): # last input is for time index; ignored here
+    def loss(self, x, cond, _, hpwl_weight=0.0, legality_weight=0.0): # last input is for time index; ignored here
         B = x.shape[0] # x is (B, V, F) for graphs
         t = self._t_dist.sample((B,)).squeeze(dim = -1)
         assert t.shape == (B,), "t has to have shape (B,)"
-        
+
         # prepare mask
         mask = None
         if self.mask_key and self.mask_key in cond:
@@ -1379,7 +1379,29 @@ class ContinuousDiffusionModel(nn.Module):
 
         pred_masked = eps_predict.detach()[torch.logical_not(mask).expand(x.shape)] if mask is not None else eps_predict.detach()
         metrics = {"epsilon_theta_mean": pred_masked.mean().cpu().numpy(), "epsilon_theta_std": pred_masked.std().cpu().numpy()}
-        return self._loss(eps_predict, epsilon, mask), metrics
+        denoising_loss = self._loss(eps_predict, epsilon, mask)
+
+        # Auxiliary losses on predicted_x0 (direct gradient, ReFL-style)
+        if hpwl_weight > 0 or legality_weight > 0:
+            input_dims = len(x.shape[1:])
+            alpha_t = self._noise_scheduler.alpha(t).view((B, *([1] * input_dims)))
+            sigma_t = self._noise_scheduler.sigma(t).view((B, *([1] * input_dims)))
+            predicted_x0 = (x_perturbed - sigma_t * eps_predict) / alpha_t
+            predicted_x0 = torch.where(mask, x, predicted_x0) if mask is not None else predicted_x0
+            predicted_x0 = torch.clamp(predicted_x0, -2, 2)
+
+            total_loss = denoising_loss
+            if hpwl_weight > 0:
+                hpwl_loss = guidance.hpwl_guidance_potential(predicted_x0, cond).mean()
+                total_loss = total_loss + hpwl_weight * hpwl_loss
+                metrics["hpwl_loss"] = hpwl_loss.detach().cpu().item()
+            if legality_weight > 0:
+                legality_loss = guidance.legality_guidance_potential(predicted_x0, cond, mask=mask).mean()
+                total_loss = total_loss + legality_weight * legality_loss
+                metrics["legality_loss"] = legality_loss.detach().cpu().item()
+            return total_loss, metrics
+
+        return denoising_loss, metrics
 
     def forward_samples(self, x, cond, intermediate_every = 0):
         intermediates = []
