@@ -1,0 +1,6 @@
+- [User profile](user_profile.md) — ML researcher, chipdiffusion verify+improve, 中文，docs-driven workflow
+- [Docs-driven workflow](feedback_docs_workflow.md) — plan_N→run→report_N→next_N→plan_(N+1); reports must cite plan's decision criteria
+- [Method ranking](project_experiment_ranking.md) — ISPD2005 leaderboard: Ablation 10k (44.01) > DDPO v2 > AddLoss v2 (45.24) > paper (46.89)
+- [AddLoss v2 status](project_addloss_v2_status.md) — eval completed Apr 15, avg 45.24, plan says "continue adjusting" but gain is marginal; suggest pivoting to Best-of-N
+- [SVDD direction (active)](project_svdd_direction.md) — 2026-05-19 next direction: inference-time SVDD-PM (RL-guided); survey + plan_1 committed, implementation pending
+- [Project doc paths](reference_project_docs.md) — CLAUDE.md, context.txt, docs/{plan,report,next,meet}/ entry points for new sessions

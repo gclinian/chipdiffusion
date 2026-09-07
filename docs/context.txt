@@ -1,0 +1,255 @@
+================================================================================
+CHIPDIFFUSION PROJECT CONTEXT — for new session handoff
+================================================================================
+
+## Project overview
+
+Goal: verify paper "ChipDiffusion" (arxiv 2407.12282) ISPD2005 results, then
+improve beyond paper using various fine-tuning / loss modification strategies.
+
+Repo: github.com:gclinian/chipdiffusion.git, branch=main
+Path: /ibmnas/427/r115/gclin/Desktop/chipdiffusion
+Conda env: chipdiff (at /ibmnas/427/r115/gclin/miniforge3)
+
+IMPORTANT: Always read these first in new session:
+  - CLAUDE.md (project rules: docs naming, tmux, PYTHONPATH=., etc.)
+  - docs/plan/*, docs/report/*, docs/next/*, docs/meet/* (experiment history)
+
+Note: filesystem `/ibmnas/...` is a NAS mount, so multiple servers see the
+same files. If the user migrates servers, the repo and checkpoints are
+accessible from both.
+
+## Project structure rules (from CLAUDE.md)
+
+- 所有文件統一放在 `docs/` 下
+- 實驗報告: docs/report/<name>_report_<N>.md
+- 計畫文件: docs/plan/<name>_plan_<N>.md
+- 回顧筆記: docs/next/<name>_next_<N>.md
+- 會議記錄: docs/meet/meet_<MMDD>.md
+- 流程: plan_N → 執行實驗 → report_N → next_N → plan_N+1
+- 所有指令需 `PYTHONPATH=.` prefix
+- 跑 eval 的 `from_checkpoint` 要用相對於 `log_dir=logs/diffusion_debug` 的路徑，
+  不要包含 `logs/diffusion_debug/` 前綴（否則會變雙重前綴導致 checkpoint 沒載入）
+
+## Baseline: ISPD2005 with large-v2.ckpt (paper's pretrained model)
+
+7-circuit avg HPWL (x10^5, no bigblue2): 48.69
+Paper: 46.89
+
+## Experiment chronology (compressed, all COMPLETED)
+
+### DDPO run 1 (ddpo_report_1.md): REINFORCE, HPWL only reward
+- legality_weight=0 (mistake), catastrophic forgetting, val_loss → 264
+- Result: varied, legality dropped, no clear winner
+
+### DDPO run 2 (ddpo_report_2_*.md): PPO clipping + supervised + legality
+- v2 (no local reward): avg HPWL 44.65 — beat paper by 4.8%
+- v2.3 (local HPWL): 45.80
+- v2.2 (ablation, supervised only, 5k steps): 45.43
+- Critical bug discovered: eval.py 的 from_checkpoint path 被 log_dir 雙重拼接。
+  Fixed: use `from_checkpoint=v1.61-ddpo.XXX/latest.ckpt` (no `logs/diffusion_debug/` prefix)
+
+### DDPO run 3 (ddpo_report_3.md): seed ensemble + supervised 10k
+- Seed ensemble best-per-circuit: 43.89 (upper bound, requires 4× eval cost)
+- **Supervised 10k fine-tune (Ablation 10k): 44.01** ← 全局最佳
+- 訓練 17 min, 7-circuit avg 44.01
+- 關鍵洞察: supervised fine-tuning 是主要驅動力，DDPO reward signal 增益小
+
+### DDPO run 4 (ddpo_report_4.md): local reward with legality
+- v2.4: 46.50 — 更差！legality potential 在早期 timestep 爆炸 (1e10)
+- local_reward 量級從 1.2e6 → 7.8e10 (5 個數量級)
+
+### DDPO run 5 (ddpo_report_5.md): last-K local reward
+- v2.5 (K=20): 45.86 — 修正爆炸但仍沒比 DDPO v2 好
+- 結論: **local reward 方向正式放棄**
+
+### AddLoss run 1 (addloss_report_1.md): HPWL+legality 加入 training loss
+- addloss_init.md 論證: direct gradient ≠ policy gradient, 不會有 local reward
+  的失敗模式 (ReFL-style)
+- v1: 45.39 — 略差於 Ablation 10k (44.01)
+- 機制有效 (hpwl_loss 從 211 → 149), 訓練穩定
+- 但大 circuit 退步: bigblue2 +13%, bigblue4 +7.4%, adaptec4 +3.7%
+
+### AddLoss run 2 (addloss_report_2.md): timestep weighting (α_t²)
+- v2: 45.24 — 略優於 v1 (-0.33%)，但仍輸 Ablation 10k 2.8%
+- 訓練指標全面改善: val_loss 0.21→0.18, hpwl_loss 149→103, legality_loss 1.93→0.18
+- 4/8 circuit 比 v1 進步（含 bigblue2/4/adaptec4），但 bigblue3 大退步 (+15%)
+- 結論: **AddLoss 方向已充分探索，supervised 10k 仍是最強**
+
+## Current method ranking (7-circuit avg HPWL, no bigblue2)
+
+| Rank | Method | Avg HPWL | Training time |
+|------|--------|----------|---------------|
+| 1 | **Ablation 10k** (純 supervised)            | **44.01** | 17 min |
+| 2 | DDPO v2 (PPO + supervised + legality)        | 44.65 | 108 min |
+| 3 | AddLoss v2 (timestep weighting)              | 45.24 | 20 min |
+| 4 | AddLoss v1                                   | 45.39 | 18 min |
+| 5 | Ablation 5k                                  | 45.43 | 12 min |
+| 6 | DDPO v2.3 (local HPWL)                       | 45.80 | 66 min |
+| 7 | DDPO v2.5 (last-K local reward)              | 45.86 | 60 min |
+| 8 | DDPO v2.4 (local HPWL+legality)              | 46.50 | 60 min |
+| —  | Paper                                        | 46.89 | — |
+| —  | Baseline (large-v2.ckpt)                     | 48.69 | 0 |
+
+Seed Ensemble best-per-circuit upper bound: 43.89 (not a single method, just
+"if you could run all 4 seeds and pick best for each circuit").
+
+## Code changes (all committed and pushed to main)
+
+Last commit: 40a396d
+
+diffusion/ddpo.py:
+- __init__: added num_timesteps, clip_epsilon, local_reward_weight,
+  local_reward_every, local_reward_last_k
+- local_reward_fn = reward_fn (same as global; was hardcoded HPWL-only)
+- loss(): advantage clipping, log_prob scale normalization, local reward
+  computation with last-K timestep filter
+
+diffusion/models.py ContinuousDiffusionModel.loss():
+- Added params: hpwl_weight=0.0, legality_weight=0.0, use_timestep_weighting=False
+- Computes predicted_x0 with gradient
+- Adds hpwl_weight * hpwl_potential(predicted_x0) to loss
+- Adds legality_weight * legality_potential(predicted_x0) to loss
+- If use_timestep_weighting: multiplies aux loss by alpha_t² per-sample
+
+diffusion/models.py ContinuousDiffusionModel.reverse_samples():
+- Added output_log_prob param
+- Returns predicted_x0_list (for DDPO local reward)
+- Returns log_probs tensor
+
+diffusion/train_graph.py:
+- DDPO branch: mix with supervised loss (supervised_weight)
+- Passes local_reward_last_k to DDPO
+- Non-DDPO branch: reads cfg.addloss.{hpwl_weight, legality_weight,
+  use_timestep_weighting} and passes to model.loss()
+
+diffusion/configs/mode/ddpo.yaml:
+- legality_weight: 0.5 (was 0.0)
+- Added: num_timesteps 50, clip_epsilon 0.2, supervised_weight 1.0,
+  local_reward_weight 0.5, local_reward_every 5
+
+diffusion/eval.py (from older commits):
+- +start_sample: skip to N-th sample
+- +skip_guidance_threshold: auto-disable guidance for V > threshold (NOT
+  legalization)
+
+## Checkpoints on disk (all in logs/diffusion_debug/)
+
+- v1.61-ddpo.ddpo_v1_lr1e5.61/latest.ckpt        (v1, catastrophic forgetting)
+- v1.61-ddpo.ddpo_v2_ppo.61/latest.ckpt          (v2, DDPO best)
+- v1.61-ddpo.ablation_supervised_only.61/        (5k supervised)
+- v1.61-ddpo.ablation_supervised_10k.61/         (**Ablation 10k, GLOBAL BEST**)
+- v1.61-ddpo.ddpo_v2_4_local_legality.61/        (v2.4)
+- v1.61-ddpo.ddpo_v2_5_last_k.61/                (v2.5)
+- v1.61-ddpo.addloss_v1.61/                      (AddLoss v1)
+- v1.61-ddpo.addloss_v2.61/                      (AddLoss v2)
+
+## Datasets
+
+### v1.61-ddpo (used for all fine-tuning runs)
+- 1600 train + 400 val samples (config in data-gen/outputs/v1.61-ddpo/config.yaml)
+- algorithm=v2, seed=61
+- max_instance=400 macros per circuit
+- 每 circuit 平均 ~261 macros (synthetic data)
+- IMPORTANT: max 400 macros is **smaller than even smallest ISPD circuit
+  (adaptec1 has 543)**. So v1.61 doesn't actually match ISPD scale.
+
+### v2.61 (NOT YET USED — could be future experiment)
+- num_train_samples=0 (only val!), max_instance=1600
+- More closely matches ISPD circuit size range
+- Would need to regenerate with train samples to use for fine-tuning
+
+## Key learnings / insights to remember
+
+1. **Eval.py path bug**: `from_checkpoint=logs/diffusion_debug/X` gets prefixed
+   again with log_dir → double path. Always use relative `X` form. Check eval
+   log for "successfully loaded state dict for model" to confirm checkpoint loaded.
+
+2. **Pretrained large-v2.ckpt is at `../public-models/large-v2/large-v2.ckpt`**
+   relative to log_dir.
+
+3. **DDPO local reward fails** (3 variants tried) because:
+   - predicted_x0 at early timesteps is ill-defined (noisy estimate)
+   - policy gradient with batch=2 has too much variance
+   - reward magnitude can explode at early timesteps (v2.4 saw 1e10)
+
+4. **Supervised fine-tuning is the workhorse**: Ablation 10k (44.01) beats
+   every DDPO and AddLoss variant including 108-min PPO training.
+
+5. **AddLoss (ReFL-style) doesn't beat plain supervised** even with timestep
+   weighting. Hypothesis: ground truth placement already has low HPWL, so
+   the auxiliary signal is largely redundant. Direct gradient mechanism
+   itself is stable (unlike DDPO local reward), just not adding new info.
+
+6. **Professor meeting 0403** (docs/meet/meet_0403.md) suggested:
+   - Training loss HPWL/legality (AddLoss direction — tested, marginal)
+   - Local reward in DDPO (tested, failed)
+
+7. **Val loss ≠ ISPD performance**. In Ablation 10k, val loss went UP
+   (0.10→0.17) from step 1000 to 10000 but ISPD improved. Slight
+   overfitting to v1.61 helps ISPD.
+
+8. **Seed variance is significant** (adaptec2: 29.26-36.61 across 4 seeds).
+   Multi-seed reporting recommended.
+
+9. **bigblue2 (23k macros) is the only circuit losing to paper**:
+   - Our methods: HPWL 57-66
+   - Paper: 38.8 (-46%)
+   - Reason: V×V matrix for 23k macros needs 30-35 GB VRAM; we have 24 GB
+   - skip_guidance_threshold=10000 disables guidance for bigblue2, leaving
+     only legalization
+   - Paper likely uses larger GPU (40GB+) or cluster-aware guidance
+
+10. **System CPU contention**: Other users (ansys.e, redhawk+) can crater
+    eval speed by 5-13x. Check `uptime` and `top` if eval seems abnormally
+    slow.
+
+## Tools user wants used
+
+- TodoWrite for multi-step tasks
+- Background bash for long-running experiments and checks (with sleep + grep +
+  tail). Use `run_in_background: true` for training/eval; you'll get a
+  notification when it completes.
+
+## Recent discussion / where we left off
+
+User just finished asking conceptual questions to prepare for professor meeting:
+- Confirmed supervised fine-tuning mechanism (standard MSE on noise prediction)
+- Confirmed how multi-term loss is added (one sum, one backward, one step)
+- Confirmed DDPO vs AddLoss difference (policy gradient vs direct gradient)
+- Realized v1.61 (max 400 macros) is actually SMALLER than ISPD circuits,
+  so "v1.61 closer to ISPD" assumption was wrong
+- Wrote meeting report (in chat, not committed) for the professor
+
+User is now migrating to a new server / session and wants to continue work.
+
+## Pending decisions / open directions
+
+These were laid out in the last meeting report sent to the professor (see
+recent docs/meet/ if a new meeting record is created). All are unexplored:
+
+A. **Best-of-N self-improvement** — use multi-seed best output as training
+   label, then re-fine-tune. Theoretical upper bound: 43.89.
+
+B. **Cluster-aware guidance for bigblue2** — implement hierarchical guidance
+   to handle 23k macros within 24 GB. Solves the one circuit we lose paper.
+
+C. **More supervised training** — try 15k, 20k steps. Cheap to check if
+   ceiling is higher than 44.01.
+
+D. **Stacking: AddLoss starting from Ablation 10k checkpoint** — instead of
+   from large-v2. Tests if a polish on top of best supervised helps.
+
+E. **Use v2.61 dataset** (after generating train samples) — its max_instance
+   1600 is closer to ISPD scale than v1.61's 400. Could test "does dataset
+   scale matter for ISPD transfer".
+
+F. **Apply for A100 40/80 GB GPU** — would unblock bigblue2 + larger DDPO
+   batch sizes.
+
+G. **Write the paper** — current results already beat paper by 6.1%, could
+   be publishable depending on how bigblue2 is framed.
+
+================================================================================
+END CONTEXT
+================================================================================

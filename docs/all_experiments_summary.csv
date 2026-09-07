@@ -1,0 +1,30 @@
+method,description,data_source,scope,n_seeds_full7,max_circuits_per_seed,avg_HPWL_7circ,std_across_seeds,vs_paper_pct,per_seed_detail
+Ablation_10k,Pure supervised fine-tune 10k step (CLAUDE.md best). Per-circuit from ddpo_report_4.md,extracted from docs/report/,full_7_circuit,1,7,44.01,,-6.13,seed300=44.01
+Ablation_10k_repro_opt_only,Ablation 10k + opt (Phase 3 reproduce = 44.32),metrics.csv (on disk),full_7_circuit,1,7,44.32,,-5.48,seed300=44.32
+SVDD_layered_ablation_10k,SVDD layered on Ablation 10k + opt (Phase 3 Run E = 44.49),metrics.csv (on disk),full_7_circuit,1,7,44.49,,-5.13,seed300=44.49
+DDPO_v2_PPO_seed300,DDPO v2 (PPO+supervised+legality). Canonical result = 44.65. Per-circuit from ddpo_report_4.md,extracted from docs/report/,full_7_circuit,1,7,44.65,,-4.78,seed300=44.65
+SVDD_layered_large-v2,"SVDD-PM K=4 every_n=1 λ=1 layered on opt, large-v2 ckpt (Phase 5)",metrics.csv (on disk),full_7_circuit,3,7,44.85,0.65,-4.36,seed300=45.10; seed301=44.10; seed302=45.34
+FromScratch_X_pure_500k,From-scratch X: pure denoising 500k batch=32,metrics.csv (on disk),full_7_circuit,1,7,45.05,,-3.92,seed300=45.05
+FromScratch_X_pure_1.6M,From-scratch X resumed to 1.6M (crashed; basically same as 500k),metrics.csv (on disk),full_7_circuit,1,7,45.08,,-3.86,seed300=45.08
+TDS_layered_large-v2,TDS N=4 SMC importance-weighted layered on opt,metrics.csv (on disk),full_7_circuit,3,7,45.08,0.38,-3.86,seed300=44.97; seed301=45.50; seed302=44.77
+FromScratch_Y_aux_500k,From-scratch Y: + HPWL/legality aux 500k batch=32,metrics.csv (on disk),full_7_circuit,1,7,45.12,,-3.77,seed300=45.12
+CoDe_layered_large-v2,CoDe K=4 block_size=100 layered on opt,metrics.csv (on disk),full_7_circuit,3,7,45.22,0.47,-3.57,seed300=45.36; seed301=44.69; seed302=45.60
+AddLoss_v2,AddLoss v2 (HPWL+legality + α_t² timestep weighting). On-disk metrics.csv (eval_macro_only.300),metrics.csv (on disk),full_7_circuit,1,7,45.24,,-3.53,seed300=45.24
+AddLoss_v1,AddLoss v1 HPWL+legality aux (no timestep weighting). Per-circuit from addloss_report_2.md,extracted from docs/report/,full_7_circuit,1,7,45.39,,-3.21,seed300=45.39
+DDPO_v2_PPO_seed_ensemble,DDPO v2 PPO multi-seed evaluation (ddpo_report_3.md seed ensemble). seed=300 is canonical 'DDPO v2 = 44.65'.,extracted from ddpo_report_3.md,full_7_circuit,4,7,45.45,0.88,-3.08,seed300=44.65; seed400=46.38; seed500=46.01; seed600=44.75
+DDPO_v2_3_localHPWL,DDPO v2.3 local HPWL reward. Per-circuit from ddpo_report_4.md,extracted from docs/report/,full_7_circuit,1,7,45.8,,-2.32,seed300=45.80
+DDPO_v2_5_lastK,DDPO v2.5 last-K local reward. Per-circuit from ddpo_report_5.md,extracted from docs/report/,full_7_circuit,1,7,45.86,,-2.2,seed300=45.86
+DDPO_v2_4_localLegality,DDPO v2.4 local HPWL+legality. Per-circuit from ddpo_report_4.md,extracted from docs/report/,full_7_circuit,1,7,46.5,,-0.83,seed300=46.50
+Paper_Table10_published,Paper arXiv:2407.12282 Table 10 reported numbers (seed=400),paper publication,full_7_circuit,1,7,46.89,,0.0,seed400=46.89
+Our_repro_large-v2_opt_seed300,Our reproduction of paper baseline (CLAUDE.md baseline column),CLAUDE.md baseline column / verify_report.md,full_7_circuit,1,7,48.69,,3.84,seed300=48.69
+SVDD_only_large-v2_noOpt,"SVDD replaces opt entirely, large-v2",metrics.csv (on disk),full_7_circuit,1,7,66.53,,41.89,seed300=66.53
+SVDD_only_ablation_10k,SVDD only on Ablation 10k (Phase 2 Run C),metrics.csv (on disk),full_7_circuit,1,7,71.94,,53.43,seed300=71.94
+Ablation_10k_no_guidance,Ablation 10k + no guidance + opt-adam (Phase 2 Run A),metrics.csv (on disk),full_7_circuit,1,7,84.85,,80.96,seed300=84.85
+SeedEnsemble_upperBound,DDPO v2 seed ensemble best-per-circuit upper bound = 43.89 (NOT a single method),CLAUDE.md,avg_only_no_per_circuit,,,43.89,,-6.4,
+Ablation_5k,"Pure supervised fine-tune 5k step (CLAUDE.md, no per-circuit found in reports)",CLAUDE.md,avg_only_no_per_circuit,,,45.43,,-3.11,
+SVDD_Phase1_K4L1_every1_raw,Phase 1 SVDD K=4 λ=1 every_n=1 aggressive RAW,metrics.csv (on disk),subset_circuits,1,1,8.63,,,seed300(1circ)=8.63
+SVDD_Phase1_K4L1_raw,Phase 1 SVDD K=4 λ=1 (HPWL+leg) RAW,metrics.csv (on disk),subset_circuits,3,2,9.37,,,seed300(2circ)=9.70; seed301(2circ)=9.04; seed302(1circ)=9.39
+SVDD_Phase1_none_raw,Phase 1 baseline guidance=none RAW,metrics.csv (on disk),subset_circuits,3,2,9.53,,,seed300(2circ)=9.97; seed301(2circ)=9.23; seed302(1circ)=9.24
+SVDD_Phase1_K4L0_raw,Phase 1 SVDD K=4 λ=0 (HPWL only) RAW (no legalization),metrics.csv (on disk),subset_circuits,1,2,9.93,,,seed300(2circ)=9.93
+SVDD_Phase1_K8L0_raw,Phase 1 SVDD K=8 λ=0 RAW,metrics.csv (on disk),subset_circuits,1,1,10.42,,,seed300(1circ)=10.42
+SVDD_Phase1_K4L1_late_raw,Phase 1 SVDD K=4 λ=1 start_step_frac=0.3 RAW,metrics.csv (on disk),subset_circuits,1,1,10.7,,,seed300(1circ)=10.70

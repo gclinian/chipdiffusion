@@ -19,82 +19,107 @@
 ## Project: chipdiffusion
 - Conda environment: `chipdiff` (created from `environment.yaml`; server has only one GPU, no need for `CUDA_VISIBLE_DEVICES`)
 - All commands should be run with `PYTHONPATH=.` prefix from the project root
-- **長時間實驗**（training, eval 等）必須用 tmux 執行，防止斷線中斷。用 `tmux new-session -d -s <name>` 建立 session，再用 `tmux send-keys -t <name> "command" Enter` 送指令。不要用 `tmux new-session -d -s <name> "command"` 的方式，因為指令結束後 session 會自動消失。
 - Generated data goes to `data-gen/outputs/`
 - Pre-trained model checkpoint at `logs/public-models/large-v2/large-v2.ckpt`
 
-## Code Modifications (by Claude)
-- **`diffusion/eval.py`** has been modified with two new parameters:
-  - `start_sample`: Resume eval from a specific sample index (default: 0). Hydra requires `+start_sample=N` prefix.
-  - `skip_guidance_threshold`: Auto-disable guidance for circuits with macro count > threshold to avoid OOM (default: 0 = never skip). Hydra requires `+skip_guidance_threshold=N` prefix.
-  - **Note**: `skip_guidance_threshold` only skips guidance, NOT legalization. Legalization also uses V×V matrix so bigblue2 (23k macros) will OOM on both. bigblue2 must be skipped entirely on 24GB GPU.
-- These are NOT in the original repo. If code is re-cloned, these changes need to be re-applied.
+## Current Experiment Status
+
+**See `docs/context.txt` for up-to-date experiment status, method rankings,
+and pending directions.** This CLAUDE.md only contains persistent rules and
+gotchas; experimental results change too often to track here.
+
+Current best (as of latest update): **Ablation 10k** (純 supervised
+fine-tuning, 10000 steps on v1.61-ddpo) → 7-circuit avg HPWL 44.01 (beats
+paper's 46.89 by 6.1%).
+
+## Code Modifications (by Claude, all committed)
+
+- **`diffusion/eval.py`** new params (require `+` Hydra prefix):
+  - `+start_sample=N`: Resume eval from sample index N
+  - `+skip_guidance_threshold=N`: Auto-disable guidance for circuits with
+    macros > N. **Only skips guidance, not legalization.** Legalization
+    actually fits in 24GB for bigblue2 (takes ~100 min though).
+
+- **`diffusion/ddpo.py`** params: `num_timesteps`, `clip_epsilon`,
+  `supervised_weight`, `local_reward_weight`, `local_reward_every`,
+  `local_reward_last_k`. Implements PPO-style clipping, log-prob scale
+  normalization, mixed supervised loss, and (optional, last-K) local reward.
+
+- **`diffusion/models.py`** `ContinuousDiffusionModel.loss()` accepts
+  `hpwl_weight`, `legality_weight`, `use_timestep_weighting` for ReFL-style
+  auxiliary loss on predicted_x0.
+
+- **`diffusion/models.py`** `reverse_samples()` accepts `output_log_prob=True`
+  to also return per-step log probs and predicted_x0 list (used by DDPO).
+
+- **`diffusion/train_graph.py`** glue to pass these new params through.
+
+- **`diffusion/configs/mode/ddpo.yaml`** legality_weight default 0.0 → 0.5.
 
 ## Repo Structure Gotchas
 - **ISPD task name**: User's parsed ISPD data is at `datasets/graph/ispd2005-s0/` (not `ispd2005`). Use `task=ispd2005-s0`. The code has a special case for `dataset_name == "ispd2005"` (zeroes out is_ports) that won't trigger with `ispd2005-s0`.
-- **Hydra override syntax**: Use `guidance@_global_=opt` or `legalizer@_global_=opt-adam`, NOT `guidance=opt`. The `@_global_` suffix is required for package overrides. New keys need `+` prefix (e.g., `+start_sample=5`).
-- **Guidance OOM on large circuits**: Any circuit with >~10k macros will OOM on guidance AND legalization (V×V matrix). Must use `macros_only=True` and skip bigblue2 entirely, or use clustering.
+- **Hydra override syntax**: Use `guidance@_global_=opt` or `legalizer@_global_=opt-adam`, NOT `guidance=opt`. The `@_global_` suffix is required for package overrides. New keys need `+` prefix (e.g., `+start_sample=5`). Same applies to `mode@_global_=finetune` / `mode@_global_=ddpo`.
+- **`from_checkpoint` path bug** (IMPORTANT): `eval.py` and `train_graph.py` do `os.path.join(cfg.log_dir, cfg.from_checkpoint)`. Since `log_dir=logs/diffusion_debug`, passing `from_checkpoint=logs/diffusion_debug/X/latest.ckpt` produces `logs/diffusion_debug/logs/diffusion_debug/X/latest.ckpt` — doubled path, silent fail. Always use **relative to log_dir**:
+  - From a saved run: `from_checkpoint=v1.61-ddpo.<method>.61/latest.ckpt`
+  - From pretrained: `from_checkpoint=../public-models/large-v2/large-v2.ckpt`
+  - **Always verify** the eval log contains "successfully loaded state dict for model" — if it says "no checkpoint at ... found", the path is wrong.
+- **bigblue2 (23k macros)**: Guidance V×V matrix OOMs on 24GB. Set `+skip_guidance_threshold=10000` to auto-skip guidance for this circuit. **Legalization itself does NOT OOM** (takes ~100 min though). bigblue2 still loses to paper (HPWL 57-66 vs paper 38.8) because we have no guidance.
+- **Guidance OOM on large circuits**: Circuits with >~10k macros will OOM on guidance (V×V matrix). Use `+skip_guidance_threshold=10000` and `macros_only=True`.
 - **generate_parallel.py num_workers**: Default is 64, which can OOM and kill SSH. Use fewer workers (e.g., 4) or use `generate.py` for single-process.
 - **`placements/macro-ispd/`**: These results are from the **paper authors** (checkpoint `v2_gmix1.6_2x...ckpt`), NOT from our runs. They match paper Table 10 exactly.
+- **System CPU contention** (NAS server): Other users (ansys.e, redhawk+) can crater eval speed 5-13x. Check `uptime` and `top` if eval seems abnormally slow. The GPU may show 11% util but actual compute is CPU-bound.
 
-## Verification Progress (as of 2026-04-01)
+## ISPD2005 Reference Tables (stable info)
 
-### Goal
-Verify chipdiffusion paper (arxiv 2407.12282) reported performance on real benchmarks.
+### ISPD2005 Macro Counts and runnability on 24GB GPU
+| idx | Circuit  | Macros | Guidance? | Legalization? |
+|-----|----------|--------|-----------|---------------|
+| 0   | adaptec1 | 543    | ✓         | ✓             |
+| 1   | adaptec2 | 566    | ✓         | ✓             |
+| 2   | adaptec3 | 723    | ✓         | ✓             |
+| 3   | adaptec4 | 1,329  | ✓         | ✓             |
+| 4   | bigblue1 | 560    | ✓         | ✓             |
+| 5   | bigblue2 | 23,084 | ✗ OOM (V×V) | ✓ (~100 min)  |
+| 6   | bigblue3 | 1,298  | ✓         | ✓             |
+| 7   | bigblue4 | 8,170  | ✓         | ✓ (~25 min)   |
 
-### Completed
-1. v1 data generated — 2000 val samples in `data-gen/outputs/v1.61/`
-2. IBM benchmark downloaded & parsed — `datasets/graph/ibm.cluster512.v1/` and `ibm.cluster0.v1/` (18 circuits each)
-3. ISPD2005 benchmark downloaded & parsed — `datasets/graph/ispd2005-s0/` (8 circuits)
-4. hmetis installed — `hmetis-1.5-linux/` in repo root
-5. ISPD2005 macro-only eval — **completed** for 7/8 circuits (samples 0-4, 6-7). Merged metrics in `logs/diffusion_debug/ispd2005-s0.eval_macro_only.300/metrics.csv`
+For bigblue2: use `+skip_guidance_threshold=10000` to auto-disable guidance.
+Without paper-style guidance, HPWL stays ~57-66 vs paper's 38.8.
 
-### ISPD2005 Results (our runs vs paper, seed=300 vs paper seed=400, HPWL x10^5)
+### Baseline ISPD2005 Results (large-v2.ckpt, seed=300, HPWL x10^5)
+| Circuit | Baseline | Paper | Note |
+|---------|---------:|------:|------|
+| adaptec1 | 10.22 | 9.19 | |
+| adaptec2 | 39.06 | 31.0 | baseline legality low (0.93) |
+| adaptec3 | 62.14 | 54.4 | |
+| adaptec4 | 60.51 | 54.5 | |
+| bigblue1 | 2.69 | 2.64 | very close |
+| bigblue2 | skip | 38.8 | guidance OOM (24GB) |
+| bigblue3 | 34.26 | 35.9 | beats paper |
+| bigblue4 | 131.96 | 140.6 | beats paper |
+| Avg (7, no bb2) | **48.69** | **46.89** | |
 
-| idx | Circuit  | Ours HPWL | Paper HPWL | Ours Legality | Ours Ratio | Note |
-|-----|----------|-----------|------------|---------------|------------|------|
-| 0   | adaptec1 | 10.22     | 9.19       | 0.9942        | 0.718      |      |
-| 1   | adaptec2 | 39.06     | 31.0       | 0.9305        | 1.056      | legality low |
-| 2   | adaptec3 | 62.14     | 54.4       | 0.9943        | 0.798      |      |
-| 3   | adaptec4 | 60.51     | 54.5       | 0.9965        | 0.679      |      |
-| 4   | bigblue1 | 2.69      | 2.64       | 0.9963        | 0.822      | very close |
-| 5   | bigblue2 | skipped   | 38.8       | -             | -          | OOM (23k macros) |
-| 6   | bigblue3 | 34.26     | 35.9       | 0.9951        | 0.598      | better than paper |
-| 7   | bigblue4 | 131.96    | 140.6      | 0.9914        | 0.491      | better than paper |
-
-Detailed comparison saved in `logs/diffusion_debug/ispd2005-s0.eval_macro_only.300/comparison_with_paper.csv`.
+Our best (Ablation 10k fine-tune): 7-circuit avg **44.01** (−6.1% vs paper).
+See docs/context.txt for the full method ranking and per-circuit results.
 
 ### Differences from Paper's Eval Process
-- **Seed**: ours=300, paper=400 — likely source of per-circuit variation
-- **Guidance**: all 7 circuits had guidance **enabled** (skip_guidance_threshold=10000 was not triggered for any circuit we ran). Same as paper.
-- **bigblue2 skipped**: paper ran it (likely with >24GB GPU), we OOM on both guidance and legalization
-- **Hyperparameters**: identical to paper (guidance steps=20, legalization steps=20000, etc.)
-- **Checkpoint**: same pre-trained `large-v2.ckpt`
-
-### In Progress / Not Done
-- v2 data not generated
-- IBM eval not run yet
-
-### ISPD2005 Macro Counts
-| idx | Circuit  | Macros | Runnable on 24GB? |
-|-----|----------|--------|-------------------|
-| 0   | adaptec1 | 543    | Yes               |
-| 1   | adaptec2 | 566    | Yes               |
-| 2   | adaptec3 | 723    | Yes               |
-| 3   | adaptec4 | 1,329  | Yes               |
-| 4   | bigblue1 | 560    | Yes               |
-| 5   | bigblue2 | 23,084 | No (OOM)          |
-| 6   | bigblue3 | 1,298  | Yes               |
-| 7   | bigblue4 | 8,170  | Yes               |
+- **Seed**: ours=300, paper=400 — source of per-circuit variation
+- **bigblue2**: paper ran with full guidance (likely >24GB GPU or clusters);
+  we disable guidance via `skip_guidance_threshold=10000`
+- **Hyperparameters**: identical to paper (guidance steps=20, legalization
+  steps=20000, etc.) for all other circuits
 
 ## Correct Eval Commands
 
-### ISPD2005 macro-only eval
+> NOTE: `from_checkpoint` is joined with `log_dir=logs/diffusion_debug`, so
+> paths MUST be relative to that. See the path-bug gotcha above.
+
+### ISPD2005 macro-only eval (from pretrained / paper baseline)
 ```bash
 PYTHONPATH=. python diffusion/eval.py \
   method=eval_macro_only \
   task=ispd2005-s0 \
-  from_checkpoint=logs/public-models/large-v2/large-v2.ckpt \
+  from_checkpoint=../public-models/large-v2/large-v2.ckpt \
   legalizer@_global_=opt-adam \
   guidance@_global_=opt \
   num_output_samples=8 \
@@ -110,12 +135,18 @@ PYTHONPATH=. python diffusion/eval.py \
   logger.wandb=false
 ```
 
-### IBM clustered eval
+### ISPD2005 eval from a fine-tuned checkpoint
+Replace the `from_checkpoint` with the run's relative path, e.g.:
+```
+from_checkpoint=v1.61-ddpo.ablation_supervised_10k.61/latest.ckpt
+```
+
+### IBM clustered eval (not yet validated this project run)
 ```bash
 PYTHONPATH=. python diffusion/eval.py \
   method=eval_guided \
   task=ibm.cluster512.v1 \
-  from_checkpoint=logs/public-models/large-v2/large-v2.ckpt \
+  from_checkpoint=../public-models/large-v2/large-v2.ckpt \
   num_output_samples=18 \
   cluster.cached_clusters=true \
   logger.wandb=false
