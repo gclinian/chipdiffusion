@@ -654,6 +654,31 @@ def postprocess_placement(x, cond, chip_size=None, process_graph=False):
         cond.x = (cond.x * scale)/2
         return x, cond
 
+def dihedral_transform_graph(x, cond, k):
+    """Apply one of the 8 dihedral (D4) symmetries of the square canvas.
+    HPWL- and legality-invariant: canvas is [-1,1]^2 centered at origin.
+    k in 0..7: optional mirror across y-axis (k>=4) then (k%4) x 90-degree CCW rotations.
+    - x: (..., V, 2) positions
+    - cond.x: (V, 2) object sizes -> (h, w) swap on odd rotations
+    - cond.edge_attr: (E, 4) pin offsets relative to object centers -> same linear map as positions
+    Returns transformed (x, cond); cond is cloned, input untouched (dataset objects are cached).
+    """
+    cond = cond.clone()
+
+    def t2(p):
+        px, py = p[..., 0], p[..., 1]
+        if k >= 4:
+            px = -px
+        for _ in range(k % 4):
+            px, py = -py, px
+        return torch.stack((px, py), dim=-1)
+
+    x_out = t2(x)
+    cond.edge_attr = torch.cat((t2(cond.edge_attr[:, 0:2]), t2(cond.edge_attr[:, 2:4])), dim=-1)
+    if (k % 2) == 1:
+        cond.x = cond.x[:, [1, 0]]
+    return x_out, cond
+
 def edge_dropout(x, cond, dropout_probability):
     _, E = cond.edge_index.shape
     E = E//2 # forward and reverse edges are included in edge_index. we only want forward edges
@@ -756,6 +781,8 @@ class GraphDataLoader:
             val_shuffle = True,
             num_workers = 8,
             pin_memory = False,
+            augment_dihedral = False,
+            edge_dropout_p = 0.0,
         ):
         self.device = train_device
         self.train_batch_size = train_batch_size
@@ -765,6 +792,8 @@ class GraphDataLoader:
         self._display_x = {}
         self._display_y = {}
         self.preprocess_fn = preprocess_fn
+        self.augment_dihedral = augment_dihedral
+        self.edge_dropout_p = edge_dropout_p
 
         self.is_shuffle = {"train": train_shuffle, "val": val_shuffle}
         self.current_idx = {"train": 0, "val": 0} # For non-shuffle
@@ -781,7 +810,16 @@ class GraphDataLoader:
             self.current_idx[split] = (self.current_idx[split] + 1) % len(dataset)
         
         x, y = dataset[idx]
-        output = self.prepare_output(x.to(self.device).view(1, *x.shape).expand(batch_size, *x.shape), y.to(self.device))
+        x = x.to(self.device).view(1, *x.shape).expand(batch_size, *x.shape)
+        y = y.to(self.device)
+        if split == "train":
+            if self.augment_dihedral:
+                k = int(torch.randint(0, 8, [1]))  # one transform per batch (cond is shared across batch)
+                if k != 0:
+                    x, y = dihedral_transform_graph(x, y, k)
+            if self.edge_dropout_p > 0:
+                x, y = edge_dropout(x, y, self.edge_dropout_p)
+        output = self.prepare_output(x, y)
         return output
 
     def get_display_batch(self, display_batch_size, split="val"):

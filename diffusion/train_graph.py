@@ -30,9 +30,13 @@ def main(cfg):
     # Preparing dataset
     train_set, val_set = utils.load_graph_data(cfg.task, augment = cfg.augment, train_data_limit = cfg.train_data_limit, val_data_limit = cfg.val_data_limit)
     sample_shape = train_set[0][0].shape
-    dataloader = utils.GraphDataLoader(train_set, val_set, cfg.batch_size, cfg.val_batch_size, device)
+    dataloader = utils.GraphDataLoader(
+        train_set, val_set, cfg.batch_size, cfg.val_batch_size, device,
+        augment_dihedral = cfg.augment,
+        edge_dropout_p = cfg.get("edge_dropout", 0) or 0,
+    )
     with open_dict(cfg):
-        if cfg.family in ["cond_diffusion", "continuous_diffusion", "self_cond_diffusion", "skip_diffusion", "guided_diffusion", "skip_guided_diffusion"]:
+        if cfg.family in ["cond_diffusion", "continuous_diffusion", "self_cond_diffusion", "skip_diffusion", "guided_diffusion", "skip_guided_diffusion", "flow_matching"]:
             cfg.model.update({
                 "num_classes": cfg.num_classes,
                 "input_shape": tuple(sample_shape),
@@ -49,6 +53,7 @@ def main(cfg):
     model_types = {
         "cond_diffusion": models.CondDiffusionModel,
         "continuous_diffusion": models.ContinuousDiffusionModel, # Use this!
+        "flow_matching": models.FlowMatchingModel,
         "self_cond_diffusion": models.SelfCondDiffusionModel,
         "mixed_diffusion": models.ChipDiffusionModel,
         "skip_diffusion": models.SkipDiffusionModel,
@@ -116,6 +121,7 @@ def main(cfg):
                 x, cond, t,
                 hpwl_weight=addloss.get("hpwl_weight", 0.0),
                 legality_weight=addloss.get("legality_weight", 0.0),
+                use_timestep_weighting=addloss.get("use_timestep_weighting", False),
             )
         else:
             ddpo_loss, model_metrics = ddpo_model.loss(x, cond)
