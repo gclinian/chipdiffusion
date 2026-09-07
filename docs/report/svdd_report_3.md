@@ -1,3 +1,30 @@
+> # ⚠️ 更正聲明 CORRECTION（2026-09-07）— 本報告核心結論已被推翻
+>
+> **本報告 §1 / §5 / §11 宣告的「inference-time search（SVDD/CoDe/TDS 整族）正式判定 dead end」是錯的，已被 Phase 4-5 推翻。** 依專案慣例，report 是歷史紀錄、**不改寫**，以下原文全部保留，僅加註更正。
+>
+> **根本原因（framing error）**：Phase 3 的 Run F（44.321）用的是**使用者自己 fine-tune 出來的 `ablation_supervised_10k` checkpoint**，卻在本報告裡被當成「paper baseline / paper 方法」。Paper 真正的 baseline 是 **`large-v2` + opt = 46.89（paper 公告, seed 400）／ 48.691（我們環境重現, seed 300）**；44.01 / 44.321 是我們自己贏 paper ~6% 的結果。等於拿 SVDD 去挑戰一個比 paper 強 9% 的自家最佳 checkpoint —— 比出「持平」當然**不能**推論成「對 paper 沒有增量」。
+>
+> **在 paper 真正的 checkpoint（large-v2）上重跑之後**（數字由 `docs/all_experiments_per_circuit.csv` 重新計算確認）：
+>
+> | 方法（large-v2 + opt-adam legalization） | 7-circuit avg HPWL | seeds | vs paper 46.89 |
+> |---|---:|---|---|
+> | **SVDD_layered** | **44.845 ± 0.654** | 45.097 / 44.103 / 45.335 | **3/3 seeds 全贏** |
+> | TDS_layered | 45.081 ± 0.376 | 44.973 / 45.499 / 44.772 | 3/3 seeds 全贏 |
+> | CoDe_layered | 45.216 ± 0.469 | 45.361 / 44.692 / 45.596 | 3/3 seeds 全贏 |
+> | 純 opt（我們重現 paper baseline） | 48.691 | 300 (n=1) | — |
+>
+> → 本報告 §5 觸發的「正式放棄」判定**不成立**；被判死刑的 SVDD/CoDe/TDS **三族在 paper checkpoint 上全部贏 paper**。
+>
+> **依據**：`docs/report/svdd_report_4.md` §7（明文指出本報告 §1 / §11 的措辭必須修正）、`docs/report/svdd_report_5.md` §8（「**完全推翻**」）、`docs/next/svdd_next_3.md` §1-4。
+>
+> **仍然成立的部分**：Phase 3 的程式碼、執行與數字本身沒有錯（CSV 重算 Run F = 44.321、Run E = 44.485，與內文 44.32 / 44.49 一致）。**「在已經 fine-tune 過的 ablation_10k 上，SVDD 疊加在 opt 之上沒有增量（+0.37%）」這句仍是有效結論**（headroom 假說）。錯的只是把它外推成「整個 inference-time search 方向 dead end」。
+>
+> **受影響章節**：§1（判定基準列 / 核心結論列 / 下一步列）、§2、§5、§7（「沒有 production value」）、§11（一句話結論）── 一律以 `docs/report/svdd_report_5.md` 為準。
+>
+> **小 caveat**（給後續引用者）：翻盤結論是 n=3。`svdd_report_5.md` §2.2 的 95% CI 用了 z=1.96 算成 [44.11, 45.59]；n=3 正確的 t 區間（t.975,df=2 = 4.303）是 **[43.22, 46.47]**。上界仍 < 46.89，**結論不變**，但區間比 report_5 寫的寬，引用時請用 t 區間。
+
+---
+
 # SVDD-PM 第三次實驗 Report (Phase 3: SVDD layered on paper opt guidance)
 
 > Plan: `docs/plan/svdd_plan_3.md`
@@ -11,6 +38,8 @@
 ---
 
 ## 1. 結論摘要
+
+> ⚠️ **[已更正 2026-09-07]** 下表第 3-5 列（「持平 → inference-time search 路線正式放棄」、「SVDD-PM 在 paper opt guidance 強度下沒有 marginal value」、下一步「轉從頭 train」）**已被推翻**。Run F 44.32 是 `ablation_10k`（我們自己 fine-tune 的 ckpt），**不是 paper baseline**；paper baseline = `large-v2` + opt = 46.89（公告）／ 48.691（我們重現）。在 large-v2 上 SVDD_layered = **44.845 ± 0.654（3 seeds，3/3 贏 paper）**。見頁首更正聲明與 `docs/report/svdd_report_5.md` §8。
 
 | 項目 | 結果 |
 |------|------|
@@ -89,6 +118,8 @@ Run E **沒進 top 2，也沒進 leaderboard 前段**（落在 Run F 跟 DDPO v2
 
 **觸發「持平」結論。inference-time search 路線（SVDD/CoDe/TDS 整族）正式判定無法在 paper opt guidance 之上產生增量價值。**
 
+> ⚠️ **[已更正 2026-09-07]** 這段判定**已被推翻**。plan_3 §5.2 的整套判定基準建立在「Run F = paper baseline」這個錯誤前提上 —— Run F 用的是自家 fine-tuned 的 `ablation_10k`，不是 paper 的 `large-v2`。因此 Δ=+0.37% 只能支持「**在 ablation_10k 這個已接近 floor 的 ckpt 上** SVDD 無增量」，**不能**外推到「inference-time search 整族無價值」。在 paper 真正的 large-v2 上：SVDD_layered 44.845 ± 0.654、TDS_layered 45.081 ± 0.376、CoDe_layered 45.216 ± 0.469，**三族各自 3/3 seeds 全贏 paper 46.89**。見 `docs/report/svdd_report_5.md` §8（「完全推翻」）。
+
 ---
 
 ## 6. 為什麼 SVDD layered 沒贏 opt？
@@ -162,5 +193,9 @@ SVDD 的 cost 是可負擔的（K=4 forward），但既然沒贏，不必再投�
 ---
 
 ## 11. 一句話結論
+
+> ⚠️ **[已更正 2026-09-07]** 下面這句的後半「Inference-time search 整個方向（SVDD/CoDe/TDS）正式判定 dead end」**已被 `docs/report/svdd_report_5.md` §8 完全推翻**（`svdd_report_4.md` §7 亦明文要求修正本節措辭）。句中「paper opt = 44.32」是誤標 —— 那是 `ablation_10k` + opt，paper 是 `large-v2` + opt = 46.89 / 48.691。數字比較本身無誤（CSV 重算 Run E = 44.485 vs Run F = 44.321），錯在把它當成「vs paper」。
+>
+> **正確說法**：**對已經 fine-tune 過的 checkpoint（ablation_10k）SVDD 沒有 marginal value；對 paper 原始 checkpoint（large-v2）SVDD layered on opt 3-seed = 44.845 ± 0.654，贏 paper 46.89 約 −4.4%，3/3 seeds 全贏。** Inference-time search 路線並未 dead end，且與 fine-tuning 是平行的 axis（headroom 假說）。
 
 **SVDD-PM 機制可運作，但在 chipdiffusion 任務上 — 不管單獨用還是疊加 paper 的 opt guidance — 都沒有 marginal value。Phase 3 確認 SVDD + opt = 44.49 vs paper opt = 44.32（+0.37%, 持平）。Inference-time search 整個方向（SVDD/CoDe/TDS）正式判定 dead end，下一步轉教授建議 (1)「從頭 train」。**

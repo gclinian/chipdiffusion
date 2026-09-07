@@ -48,3 +48,89 @@
 
 - [ ] Part B（純優化下界，adaptec1/bigblue1，半天 GPU）— pending，等 flow matching 訓練完 GPU 空出來
 - [ ] 若要把 oracle 變成可宣稱的結果：把 best-of-4-seeds 作為正式 inference 協定重跑（cost 4×，但結果可寫進 paper）
+
+---
+
+## 附錄 A（Addendum, 2026-09-07）— 補登 4 筆結果後的 oracle 修正
+
+> **上方 §1–§5 為 2026-07-06 當下的歷史紀錄，一字未改。** 本節只記錄「資料補登之後數字如何變動」。
+> 觸發：2026-09-07 將 4 筆**已完成但從未登錄**的結果補進 `docs/all_experiments_summary.csv` 與
+> `docs/all_experiments_per_circuit.csv`，全部直接讀自 on-disk `logs/diffusion_debug/*/metrics.csv`
+> （非二手引用 report）：
+> - `FromScratch_Stage2`（v2.61 stage-2 fine-tune of Run X, ckpt `v2.61.fs_p1_X_stage2_b32.61`, eval 2026-06-12）→ avg7 **46.44**
+> - `FlowMatch_ODE50` / `FlowMatch_ODE1000` / `FlowMatch_ODE10` → avg7 **70.03 / 77.05 / 81.25**
+>
+> oracle 口徑與 §2 完全相同（排除無 legalization 的 Phase 1 raw runs、排除 paper 欄），
+> pool 由 29 個 → **33 個 deployment-comparable 結果 / circuit**。
+
+### A.1 Oracle：42.09 → **41.8444**
+
+7 個 winner 中**只有 adaptec2 換人**，其餘 6 個原封不動：
+
+| Circuit | §2 原 oracle | 來源 | 新 oracle | 新來源 | 變動 |
+|---|---:|---|---:|---|---|
+| adaptec1 | 8.84 | SVDD_layered_large-v2 (s300) | 8.8432 | 同左 | — |
+| **adaptec2** | **28.36** | CoDe_layered_large-v2 (s301) | **26.6463** | **FromScratch_Stage2 (s300)** | **−1.72** |
+| adaptec3 | 51.60 | AddLoss_v1 (s300) | 51.60 | 同左 | — |
+| adaptec4 | 51.15 | DDPO seed ensemble (s600) | 51.15 | 同左 | — |
+| bigblue1 | 2.59 | AddLoss_v1 (s300) | 2.59 | 同左 | — |
+| bigblue3 | 30.32 | AddLoss_v1 (s300) | 30.32 | 同左 | — |
+| bigblue4 | 121.76 | SVDD_layered_large-v2 (s301) | 121.7616 | 同左 | — |
+| **avg(7)** | **42.0899** | — | **41.8444** | — | **−0.2455** |
+
+全部改善量 = (28.3646 − 26.6463)/7 = 0.2455，**100% 來自單一格子**。
+26.6463 也是全專案 adaptec2 的最低值（次低 28.3646）。
+headroom 由 vs Ablation 10k −4.36% / vs paper −10.24% 變成 **−4.92% / −10.76%**。
+
+### A.2 但這個進步是拿 legality 換來的
+
+`FromScratch_Stage2` adaptec2 的 **macro_legality = 0.9623**，比它取代掉的
+CoDe s301 那格（**0.9781**）**更差**。也就是說 41.8444 並不是「更好的擺放」，
+而是「更不合法但線長更短的擺放」。**引用 oracle 數字時必須同時報 legality**，否則等於用違規面積換 HPWL。
+
+附帶脈絡：`FromScratch_Stage2` 本身是一次 **regression** — avg7 46.44 vs 其 Stage 1 起點
+(FromScratch_X_pure_500k) 45.05，**+3.08%**，主因 bigblue4 129.23 → 145.60（+12.67%）。
+它整體變差，卻提供了全專案最好的一格 adaptec2 —— 正是 §2 觀察「各方法擅長不同 circuit」的又一例證。
+
+### A.3 加上 legality 門檻後的 oracle
+
+| macro_legality 門檻 | oracle avg(7) | adaptec2 取到誰 |
+|---|---:|---|
+| 無門檻 | **41.8444** | 26.6463 FromScratch_Stage2 (0.9623) |
+| ≥ 0.95 / ≥ 0.96 | 42.1083 | 26.6463 FromScratch_Stage2 (0.9623) |
+| ≥ 0.97 | 42.3538 | 28.3646 CoDe s301 (0.9781) |
+| ≥ 0.98 | 42.8135 | 31.583 AddLoss_v2 s300 (0.9843) |
+| ≥ 0.99 | **INFEASIBLE** | 全專案 adaptec2 最高 legality 僅 0.9843 → 無解 |
+
+注意一個反直覺點：**連最鬆的 ≥0.95 門檻都讓 oracle 變差**（41.8444 → 42.1083）。
+原因不是 legality 卡到，而是 A.4 的資料缺漏 —— 無門檻 oracle 的 7 個 winner 裡有
+**4 個（adaptec3 / adaptec4 / bigblue1 / bigblue3）根本沒有 macro_legality 紀錄**，
+一加門檻就整列被丟掉。換句話說 41.8444 有一部分是「因為那些列無法被 legality 稽核」才成立的。
+
+### A.4 資料完整性警告（重要）
+
+**222 列 oracle-relevant 資料中有 95 列完全沒有 macro_legality**（= 補登前 CSV 內所有數值列，
+扣掉 15 列 Phase 1 raw；含 bigblue2 與 paper 欄）。→ 只有 **127/222 = 57.2%** 可用，
+**任何 legality-constrained oracle 都是在不到 60% 的資料上算出來的**，A.3 那張表要照這個折扣讀。
+
+缺漏完全集中在 data_source 為 `extracted from ...report...` 的列（二手抄自 report，report 沒抄 legality）：
+`Ablation_10k`(8)、`AddLoss_v1`(8)、`DDPO_v2_3/4/5`(各 8)、`DDPO_v2_PPO_seed300`(8)、
+`DDPO_v2_PPO_seed_ensemble`(32)、`Our_repro_large-v2_opt_seed300`(7)、`Paper_Table10_published`(8)。
+凡是 `metrics.csv (on disk)` 的列都有 legality。
+
+補登後（28 筆新列全帶 legality）同口徑為 95/250 → 62.0% 可用；若只看 §2 的嚴格 7-circuit oracle pool
+則為 77/231 缺漏 → 66.7% 可用。三個數字都指向同一件事：**約四成資料無法做 legality 稽核。**
+
+### A.5 對 §1 / §4 結論的影響
+
+1. **§4 Q1「是不是到極限了？」— 結論不變**（還沒到），且 headroom 略微變大（4.36% → 4.92%）。
+2. **§1 / §3 的「42.09」應改讀為「41.84」**，但**必須附帶 legality 條件**才誠實：
+   在 ≥0.97 門檻下只到 42.35，≥0.99 則 adaptec2 無解。對外宣稱「open literature 新低界」時，
+   建議引用**有 legality 門檻的版本**（≥0.97 → 42.35），避免被質疑用不合法擺放刷分。
+3. FlowMatch 三筆對 oracle **完全無影響**（70/77/81，全面遠差），補登只是補齊 row census。
+
+### A.6 由本次補登產生的待辦
+
+- [ ] 回填那 95 列的 `macro_legality`（需重跑 eval 或翻舊 eval log）— 在此之前，legality-constrained oracle 只能當粗估
+- [ ] `FromScratch_Stage2` 尚無對應的 `_report_N`（`from_scratch_report_1.md` 寫於 stage 2 執行之前，§10 行動清單仍把 stage 2 列為待決策項）— 需補一份，重點是「stage 2 整體 regression（+3.08%）但 adaptec2 是全專案最佳」
+- [ ] 若要正式宣稱 oracle，先決定 legality 門檻並固定下來（建議 ≥0.97，與多數 deployment run 的實際水準一致）

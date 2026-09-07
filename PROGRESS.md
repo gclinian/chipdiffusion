@@ -13,7 +13,26 @@
   建議以 3 seeds 重測。
 - **未收割**: DataAug Run C 已訓練完成 (2026-07-08) 但從未 eval；
   FromScratch Stage 2 = 46.441 (2026-06-12 已 eval) 在所有文件與 CSV 中皆無記錄。
-- [ ] P0: commit + push / 升級 torch / 升級後重跑 Run F 驗證 — **未開始**
+- [x] **P0.1 commit + push 完成**（2026-09-07）：4 個主題 commit，HEAD 40a396d → 300eb49，
+  五個月工作的單一副本風險解除。
+- [ ] P0.2 升級 torch ≥2.7/cu128（開新 env，保留 chipdiff）— **未開始，阻斷所有 GPU 工作**
+- [ ] P0.3 升級後重跑 Run F（預期 44.32）驗證 — **未開始**
+
+## Step 11: Repo 整理與 workflow 控管 (2026-09-07)
+- [x] 補記 4 筆磁碟上未記錄的結果進兩個 CSV（FromScratch_Stage2 46.441 + 3 個 flow-matching）
+- [x] 修 CSV 資料陷阱：56 列因「逗號後空格 + 引號」在天真 parser 下**無聲**變成 10 欄。
+  現已改為無引號格式，兩種 parser 讀出相同結果。
+- [x] `svdd_report_3.md` / `svdd_next_2.md` 加更正 banner（原文保留）
+- [x] 補寫 `docs/next/from_scratch_next_1.md`（Stage 2 回歸 45.05 → 46.44），
+  並修正 `from_scratch_plan_1.md` / `report_1.md` 的過期 checkbox
+- [x] 重寫 `docs/context.txt`（原本停在 2026-05-18，少了六條完成的實驗線）
+- [x] eval 目錄碰撞防護：`eval.py` / `train_graph.py` 寫入前比對既有 `config.yaml`
+  的 `from_checkpoint`，不同則中止（`+allow_overwrite=true` 可強制）
+- [x] 建立 `scripts/ledger.py` + 自動產生的 `STATUS.md`：無條件 in-process 記錄、
+  逐筆 metrics.csv 存進 `docs/ledger/results/`、三個工作佇列（中斷 / 未收割 / 未記錄）
+- [x] 停用 repo 內 `memory/`（工具讀不到且已過期四個月），改寫 harness memory
+- [x] 重寫 `CLAUDE.md`：環境阻斷警告、六條判讀規則、ledger 用法、移除過期 framing
+- Status: **Done**
 
 ## Step 9: ISPD2005 limit analysis (docs/plan/ispd_limit_plan_1.md)
 - [x] Part A oracle + Part C literature — wrote `docs/report/ispd_limit_report_1.md` (2026-07-06).

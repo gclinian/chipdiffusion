@@ -297,15 +297,15 @@ PYTHONPATH=. python diffusion/eval.py \
 
 ## 10. 行動清單
 
-- [ ] **Step 1**：Phase 1a — Run X + Run Y 各 1k pilot, check pipeline + VRAM + loss decrease
+- [x] **Step 1**：Phase 1a — Run X + Run Y 各 1k pilot
 - [ ] **Step 2**：跟 user 確認 commit 8-9 天 GPU 1，再進 Phase 1b
-- [ ] **Step 3**：Phase 1b — Stage 1 Run X 3M (long-running background, GPU 1)
+- [x] **Step 3**：Phase 1b — Stage 1 Run X（跑到 1.6M，非 3M）
 - [ ] **Step 4**：1.5M intermediate eval, decide continue/abort
-- [ ] **Step 5**：Phase 1c — Stage 1 Run Y 3M
-- [ ] **Step 6**：Phase 1d — regen v2.61 train data
-- [ ] **Step 7**：Phase 1e — Stage 2 Run X + Run Y (500k each)
-- [ ] **Step 8**：Phase 1f — final 7-circuit ISPD eval × 4 setups
-- [ ] **Step 9**：寫 `docs/report/from_scratch_report_1.md` + `docs/next/from_scratch_next_1.md`
+- [x] **Step 5**：Phase 1c — Stage 1 Run Y（500k）
+- [x] **Step 6**：Phase 1d — regen v2.61 train data（4600 train + 200 val, max_instance=1600）
+- [x] **Step 7**：Phase 1e — Stage 2 Run X 已完成並已 eval = **46.441（回歸，見 `docs/next/from_scratch_next_1.md`）**；Run Y stage 2 未做
+- [x] **Step 8**：Phase 1f — 7-circuit eval 已做 X_500k / X_1.6M / Y_500k / X_stage2
+- [x] **Step 9**：`from_scratch_report_1.md` + `from_scratch_next_1.md`（後者 2026-09-07 補寫）
 
 ---
 

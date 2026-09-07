@@ -7,6 +7,7 @@ import legalization
 import analysis_utils
 import common
 import os
+import sys
 import time
 import wandb
 
@@ -32,6 +33,71 @@ def cost(output_metrics):
         "macro_cost": macro_cost,
     }
     return costs
+
+
+def _ledger_record(log_dir):
+    """Append this run to docs/ledger/runs.jsonl and archive its metrics.csv.
+
+    Deliberately unconditional and in-process: a run launched by hand in a plain
+    shell still lands in the record, with no hook required. Deliberately fatal to
+    nothing -- a bookkeeping failure must never cost an experiment.
+    """
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__))), "scripts"))
+        import ledger
+        rid = ledger.record(log_dir)
+        if rid:
+            print(f"ledger: recorded {rid}")
+    except Exception as e:
+        print(f"ledger: skipped ({type(e).__name__}: {e})")
+
+def check_checkpoint_collision(cfg, log_dir):
+    """
+    Guards against two different checkpoints writing into the same run directory.
+
+    log_dir is named f"{task}.{method}.{seed}" and does NOT include the checkpoint
+    being evaluated, so two runs that differ only in from_checkpoint silently
+    overwrite each other's metrics.csv / samples. If log_dir already holds a
+    config.yaml recorded with a different from_checkpoint, abort. Pass
+    +allow_overwrite=true to downgrade the abort to a warning.
+    """
+    def normalize(ckpt):
+        # matches the "none" handling used when loading checkpoints below
+        return "none" if ckpt in [None, "none", "None", ""] else str(ckpt)
+
+    prev_cfg_path = os.path.join(log_dir, "config.yaml")
+    if not os.path.exists(prev_cfg_path):
+        return
+    try:
+        prev_cfg = utils.load_cfg(prev_cfg_path)
+        has_prev = "from_checkpoint" in prev_cfg
+        prev_ckpt = normalize(prev_cfg.from_checkpoint) if has_prev else None
+    except Exception as e:
+        print(f"WARNING: could not read {prev_cfg_path} ({e}). Skipping checkpoint collision check.")
+        return
+    if not has_prev:
+        print(f"WARNING: {prev_cfg_path} records no from_checkpoint. Skipping checkpoint collision check.")
+        return
+    curr_ckpt = normalize(cfg.from_checkpoint)
+    if prev_ckpt == curr_ckpt:
+        return  # same checkpoint: legitimate re-run / resume
+    msg = (
+        f"checkpoint collision in {log_dir}\n"
+        f"  existing results were produced by: {prev_ckpt}\n"
+        f"  this run would use:                {curr_ckpt}\n"
+        f"  (both are relative to log_dir={cfg.log_dir})\n"
+        f"The output directory is named '{cfg.task}.{cfg.method}.{cfg.seed}' and does not "
+        f"include the checkpoint, so continuing would overwrite the existing run's "
+        f"metrics.csv, config.yaml and samples with no way to recover them.\n"
+        f"Re-run with a distinct method= (e.g. method={cfg.method}_<checkpoint-name>) so this "
+        f"evaluation gets its own directory, or pass +allow_overwrite=true to overwrite on purpose."
+    )
+    if cfg.get("allow_overwrite", False):
+        print(f"WARNING: {msg}")
+        print("WARNING: allow_overwrite=true, overwriting anyway.")
+    else:
+        raise RuntimeError(msg)
 
 @hydra.main(version_base=None, config_path="configs", config_name="config_eval")
 def main(cfg):
@@ -164,6 +230,7 @@ def main(cfg):
 
     # Create log and output directories
     log_dir = os.path.join(cfg.log_dir, f"{cfg.task}.{cfg.method}.{cfg.seed}")
+    check_checkpoint_collision(cfg, log_dir)
     sample_dir = os.path.join(log_dir, "samples")
     checkpointer = common.Checkpointer(os.path.join(log_dir, "latest.ckpt"))
     os.makedirs(log_dir, exist_ok=True)
@@ -266,6 +333,7 @@ def main(cfg):
                 output_metrics[k] = [v]
         log_metrics.add(metrics)
     utils.dict_to_csv(output_metrics, os.path.join(log_dir,"metrics.csv"))
+    _ledger_record(log_dir)
     for plot_keys in cfg.scatter_plots:
         x_name = plot_keys[0]
         y_name = plot_keys[1]

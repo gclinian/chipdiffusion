@@ -171,7 +171,7 @@ Paper config 顯示 stage 2 fine-tune 也用 pure denoising (沒提 aux)。我�
 - [x] Subset ISPD eval (adaptec1+bigblue1) — quick check
 - [x] Full 7-circuit ISPD eval (skip bb2) — 完整對照 paper
 - [x] 寫此 report
-- [ ] 寫 `docs/next/from_scratch_next_1.md`
+- [x] 寫 `docs/next/from_scratch_next_1.md`（2026-09-07）
 - [ ] User decision: extend to 3M? skip to stage 2? multi-seed? 
 
 ---

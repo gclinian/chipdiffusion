@@ -1,254 +1,647 @@
 ================================================================================
-CHIPDIFFUSION PROJECT CONTEXT — for new session handoff
+CHIPDIFFUSION PROJECT CONTEXT — 新 session 唯一交接文件
+last updated: 2026-09-07   (前一版 2026-05-18，早於 SVDD 開跑一天，已全面作廢)
 ================================================================================
 
-## Project overview
+指標約定（全文件通用）：**7-circuit avg HPWL on ISPD2005 macro-only，×10^5，
+排除 bigblue2，越低越好**。metrics.csv 的 `hpwl_rescaled / 100` = 這個數字。
+本文件所有數值都從 `docs/all_experiments_per_circuit.csv` 與
+`logs/diffusion_debug/*/metrics.csv` 重算驗證，**不採信任何報告內文的轉述值**
+（報告內文已知有多處與自己的表格矛盾，見 §13）。
 
-Goal: verify paper "ChipDiffusion" (arxiv 2407.12282) ISPD2005 results, then
-improve beyond paper using various fine-tuning / loss modification strategies.
+--------------------------------------------------------------------------------
+## 0. 只讀三件事
+--------------------------------------------------------------------------------
 
-Repo: github.com:gclinian/chipdiffusion.git, branch=main
-Path: /ibmnas/427/r115/gclin/Desktop/chipdiffusion
-Conda env: chipdiff (at /ibmnas/427/r115/gclin/miniforge3)
+1. **環境壞了**（§2）：GPU 換成 RTX 5090 (sm_120)，torch 2.2.1 打不出 kernel。
+   修好前**不要規劃任何 GPU 工作**。CLAUDE.md 全篇仍寫 24 GB，是錯的。
+2. **對外要講的數字是 SVDD 44.845 ± 0.654 (3 seeds)**，不是 44.01（§3）。
+   44.01 只能對我們自己的復現 48.691 比，**絕不對 paper 的 46.89 比**。
+3. **關閉「fine-tuning × inference-search 不可疊加」的那條禁令是 n=1 結論**，
+   而且差值 (+0.164) 只有它自己 seed std (0.654) 的 1/4（§6.3）。值得重測。
 
-IMPORTANT: Always read these first in new session:
-  - CLAUDE.md (project rules: docs naming, tmux, PYTHONPATH=., etc.)
-  - docs/plan/*, docs/report/*, docs/next/*, docs/meet/* (experiment history)
+--------------------------------------------------------------------------------
+## 1. Project overview
+--------------------------------------------------------------------------------
 
-Note: filesystem `/ibmnas/...` is a NAS mount, so multiple servers see the
-same files. If the user migrates servers, the repo and checkpoints are
-accessible from both.
+目標：復現 paper "ChipDiffusion" (arxiv 2407.12282) 的 ISPD2005 結果，再用
+fine-tuning / loss 改造 / inference-time search / 從頭訓練等路線超越它。
 
-## Project structure rules (from CLAUDE.md)
+Repo:  github.com:gclinian/chipdiffusion.git, branch=main
+Path:  /ibmnas/427/r115/gclin/Desktop/chipdiffusion
+Conda: `chipdiff` (at /ibmnas/427/r115/gclin/miniforge3) ← **目前不能跑 GPU，見 §2**
+Data:  data-gen/outputs/ ；訓練/eval 產出 logs/diffusion_debug/
+Ckpt:  paper pretrained = logs/public-models/large-v2/large-v2.ckpt
 
-- 所有文件統一放在 `docs/` 下
-- 實驗報告: docs/report/<name>_report_<N>.md
-- 計畫文件: docs/plan/<name>_plan_<N>.md
-- 回顧筆記: docs/next/<name>_next_<N>.md
-- 會議記錄: docs/meet/meet_<MMDD>.md
-- 流程: plan_N → 執行實驗 → report_N → next_N → plan_N+1
-- 所有指令需 `PYTHONPATH=.` prefix
-- 跑 eval 的 `from_checkpoint` 要用相對於 `log_dir=logs/diffusion_debug` 的路徑，
-  不要包含 `logs/diffusion_debug/` 前綴（否則會變雙重前綴導致 checkpoint 沒載入）
+`/ibmnas/...` 是 NAS mount，多台 server 看到同一份檔案；換 server 時 repo 與
+checkpoint 都還在。
 
-## Baseline: ISPD2005 with large-v2.ckpt (paper's pretrained model)
+新 session 建議閱讀順序：
+  1. 本檔（docs/context.txt）
+  2. CLAUDE.md（**注意：其 GPU 段落與「all committed」標題已過期**）
+  3. `docs/next/comeback_next_1.md`（2026-09-06 全專案稽核，最詳細的一份，
+     含逐項證據、下一步排序 P0/P1/P2、論文可行性分析）
+  4. 需要細節時才進 docs/plan/、docs/report/、docs/meet/
 
-7-circuit avg HPWL (x10^5, no bigblue2): 48.69
-Paper: 46.89
+文件規則（CLAUDE.md）：plan_N → 實驗 → report_N → next_N → plan_N+1；
+所有指令 `PYTHONPATH=.` prefix。
 
-## Experiment chronology (compressed, all COMPLETED)
+--------------------------------------------------------------------------------
+## 2. 環境現況（2026-09-06 量測）— **BLOCKER，最優先處理**
+--------------------------------------------------------------------------------
 
-### DDPO run 1 (ddpo_report_1.md): REINFORCE, HPWL only reward
-- legality_weight=0 (mistake), catastrophic forgetting, val_loss → 264
-- Result: varied, legality dropped, no clear winner
+| 項目 | CLAUDE.md 記載 | 實際 |
+|------|---------------|------|
+| GPU  | 24 GB         | **RTX 5090, 32,607 MiB** |
+| Compute capability | sm_86/sm_89 | **sm_120 (Blackwell)** |
 
-### DDPO run 2 (ddpo_report_2_*.md): PPO clipping + supervised + legality
-- v2 (no local reward): avg HPWL 44.65 — beat paper by 4.8%
-- v2.3 (local HPWL): 45.80
-- v2.2 (ablation, supervised only, 5k steps): 45.43
-- Critical bug discovered: eval.py 的 from_checkpoint path 被 log_dir 雙重拼接。
-  Fixed: use `from_checkpoint=v1.61-ddpo.XXX/latest.ckpt` (no `logs/diffusion_debug/` prefix)
+`chipdiff` env = torch 2.2.1+cu121，其 arch_list 只到 sm_90：
 
-### DDPO run 3 (ddpo_report_3.md): seed ensemble + supervised 10k
-- Seed ensemble best-per-circuit: 43.89 (upper bound, requires 4× eval cost)
-- **Supervised 10k fine-tune (Ablation 10k): 44.01** ← 全局最佳
-- 訓練 17 min, 7-circuit avg 44.01
-- 關鍵洞察: supervised fine-tuning 是主要驅動力，DDPO reward signal 增益小
+    torch.cuda.is_available() -> True   ← 所以啟動不會報錯
+    第一次 kernel launch      -> RuntimeError: CUDA error:
+                                 no kernel image is available for execution on the device
 
-### DDPO run 4 (ddpo_report_4.md): local reward with legality
-- v2.4: 46.50 — 更差！legality potential 在早期 timestep 爆炸 (1e10)
-- local_reward 量級從 1.2e6 → 7.8e10 (5 個數量級)
+失敗模式是「實驗跑到一半神秘崩潰」，不是啟動即掛。另一個 env `diffplace`
+(torch 2.6.0+cu124) 同樣不支援。
 
-### DDPO run 5 (ddpo_report_5.md): last-K local reward
-- v2.5 (K=20): 45.86 — 修正爆炸但仍沒比 DDPO v2 好
-- 結論: **local reward 方向正式放棄**
+**修復範圍很小**：本專案沒有安裝任何需編譯的 PyG extension
+（torch-scatter / torch-sparse / torch-cluster 皆未安裝，diffusion/ 內零 import），
+只有純 Python 的 torch_geometric 2.4.0 + performer-pytorch。
+→ 這是 **pip 層級 torch >= 2.7 / cu128 升級，不是 C++ 重編**。
 
-### AddLoss run 1 (addloss_report_1.md): HPWL+legality 加入 training loss
-- addloss_init.md 論證: direct gradient ≠ policy gradient, 不會有 local reward
-  的失敗模式 (ReFL-style)
-- v1: 45.39 — 略差於 Ablation 10k (44.01)
-- 機制有效 (hpwl_loss 從 211 → 149), 訓練穩定
-- 但大 circuit 退步: bigblue2 +13%, bigblue4 +7.4%, adaptec4 +3.7%
+作法：在**新 env**（例如 `chipdiff-b`）升級，保留 `chipdiff` 原狀。
+**升級後必須先重跑一個已知結果（Run F，預期 44.321）驗證再信任任何新數字**——
+CUDA/cuDNN 換版可能改變數值，否則新舊 26 筆結果不可比。
 
-### AddLoss run 2 (addloss_report_2.md): timestep weighting (α_t²)
-- v2: 45.24 — 略優於 v1 (-0.33%)，但仍輸 Ablation 10k 2.8%
-- 訓練指標全面改善: val_loss 0.21→0.18, hpwl_loss 149→103, legality_loss 1.93→0.18
-- 4/8 circuit 比 v1 進步（含 bigblue2/4/adaptec4），但 bigblue3 大退步 (+15%)
-- 結論: **AddLoss 方向已充分探索，supervised 10k 仍是最強**
+附帶好消息：VRAM 24 → 32.6 GB。verify_report.md 估 bigblue2 guidance 峰值
+30–35 GB，24 GB 絕望、32.6 GB **邊緣可行**。但該估計是舊 torch/舊 allocator
+量的，升級後要重量，不可直接沿用。
 
-## Current method ranking (7-circuit avg HPWL, no bigblue2)
+另注意：GPU 常被其他 user 佔用（曾見 PID 96770 `train_saufno.py` 99% util）。
+所有 wall-clock 估計都要打折。
 
-| Rank | Method | Avg HPWL | Training time |
-|------|--------|----------|---------------|
-| 1 | **Ablation 10k** (純 supervised)            | **44.01** | 17 min |
-| 2 | DDPO v2 (PPO + supervised + legality)        | 44.65 | 108 min |
-| 3 | AddLoss v2 (timestep weighting)              | 45.24 | 20 min |
-| 4 | AddLoss v1                                   | 45.39 | 18 min |
-| 5 | Ablation 5k                                  | 45.43 | 12 min |
-| 6 | DDPO v2.3 (local HPWL)                       | 45.80 | 66 min |
-| 7 | DDPO v2.5 (last-K local reward)              | 45.86 | 60 min |
-| 8 | DDPO v2.4 (local HPWL+legality)              | 46.50 | 60 min |
-| —  | Paper                                        | 46.89 | — |
-| —  | Baseline (large-v2.ckpt)                     | 48.69 | 0 |
+--------------------------------------------------------------------------------
+## 3. FRAMING — 該跟誰比（**本專案犯過一次的錯，不要再犯**）
+--------------------------------------------------------------------------------
 
-Seed Ensemble best-per-circuit upper bound: 43.89 (not a single method, just
-"if you could run all 4 seeds and pick best for each circuit").
+三個參考點，**不可混用**：
 
-## Code changes (all committed and pushed to main)
+    Paper Table 10, 7-circuit (seed 400)            = 46.89
+    Paper Table 10, 8-circuit (含 bigblue2 38.80)   = 45.88
+    我們對 paper 自己 large-v2 ckpt 的復現 (seed300) = 48.691   ← 唯一同環境對照
 
-Last commit: 40a396d
+### 3.1 對外（論文 / 教授 / 審稿人）唯一最強且站得住腳的主張
 
-diffusion/ddpo.py:
-- __init__: added num_timesteps, clip_epsilon, local_reward_weight,
-  local_reward_every, local_reward_last_k
-- local_reward_fn = reward_fn (same as global; was hardcoded HPWL-only)
-- loss(): advantage clipping, log_prob scale normalization, local reward
-  computation with last-K timestep filter
+> **SVDD_layered = 44.845 ± 0.654，3 seeds，跑在 paper 自己的 frozen
+> large-v2 checkpoint 上，零訓練、零新參數，3/3 seeds 全勝 paper 的 46.89。**
 
-diffusion/models.py ContinuousDiffusionModel.loss():
-- Added params: hpwl_weight=0.0, legality_weight=0.0, use_timestep_weighting=False
-- Computes predicted_x0 with gradient
-- Adds hpwl_weight * hpwl_potential(predicted_x0) to loss
-- Adds legality_weight * legality_potential(predicted_x0) to loss
-- If use_timestep_weighting: multiplies aux loss by alpha_t² per-sample
+只有這條同時具備：(a) 同 checkpoint、(b) 有誤差棒、(c) 不需要訓練 → 不存在
+「你 fine-tune 過所以不公平」的攻擊面。
 
-diffusion/models.py ContinuousDiffusionModel.reverse_samples():
-- Added output_log_prob param
-- Returns predicted_x0_list (for DDPO local reward)
-- Returns log_probs tensor
+### 3.2 Fine-tuning 結果（44.01 / 44.321）該怎麼講
 
-diffusion/train_graph.py:
-- DDPO branch: mix with supervised loss (supervised_weight)
-- Passes local_reward_last_k to DDPO
-- Non-DDPO branch: reads cfg.addloss.{hpwl_weight, legality_weight,
-  use_timestep_weighting} and passes to model.loss()
+**對 48.691 比，不要對 46.89 比。**
+44.01 是「我們在 v1.61 上 fine-tune 過的模型、seed 300、n=1、原始 metrics.csv
+已遺失」；46.89 是「他們未 fine-tune 的已發表數字、seed 400」。跨 seed、跨訓練
+狀態、跨環境，三重不可比。
 
-diffusion/configs/mode/ddpo.yaml:
-- legality_weight: 0.5 (was 0.0)
-- Added: num_timesteps 50, clip_epsilon 0.2, supervised_weight 1.0,
-  local_reward_weight 0.5, local_reward_every 5
+正確寫法： Ablation_10k vs 我們的復現 48.691 → −9.6%（同環境同 seed）。
+錯誤寫法： 「Ablation 10k 44.01 beats paper 46.89 by 6.1%」← CLAUDE.md 與舊版
+           context.txt 的原文，**已作廢，看到就改**。
 
-diffusion/eval.py (from older commits):
-- +start_sample: skip to N-th sample
-- +skip_guidance_threshold: auto-disable guidance for V > threshold (NOT
-  legalization)
+### 3.3 為什麼特別強調這件事：專案已經被同一個坑咬過一次
 
-## Checkpoints on disk (all in logs/diffusion_debug/)
+2026-05-21，`svdd_plan_3.md` §1 把「Ablation_10k + opt = 44.01」寫成
+「Paper 方法」，於是 Phase 3 拿 SVDD 去比一個**使用者自己 fine-tune 出來的
+最強 checkpoint**，得到 Δ=+0.37% → `svdd_report_3.md` §11 直接宣告
+「inference-time search 整個方向 dead end」。是使用者當場抓到
+（"那個是我之前 finetuning 的結果"）才翻盤：改在 large-v2 上重跑 → 45.10 →
+再補 multi-seed → 44.845 ± 0.654，**從死路變成全專案對外最強的結果**。
+一個 framing 錯誤燒掉一整個 phase。
 
-- v1.61-ddpo.ddpo_v1_lr1e5.61/latest.ckpt        (v1, catastrophic forgetting)
-- v1.61-ddpo.ddpo_v2_ppo.61/latest.ckpt          (v2, DDPO best)
-- v1.61-ddpo.ablation_supervised_only.61/        (5k supervised)
-- v1.61-ddpo.ablation_supervised_10k.61/         (**Ablation 10k, GLOBAL BEST**)
-- v1.61-ddpo.ddpo_v2_4_local_legality.61/        (v2.4)
-- v1.61-ddpo.ddpo_v2_5_last_k.61/                (v2.5)
-- v1.61-ddpo.addloss_v1.61/                      (AddLoss v1)
-- v1.61-ddpo.addloss_v2.61/                      (AddLoss v2)
+現在同一個陷阱**以反方向存在**於 CLAUDE.md 與舊 context.txt（拿自己的
+fine-tune 結果去打 paper 的未 fine-tune 數字）。寫任何 plan 時，「baseline」
+必須明講是 paper 的 46.89、還是我們的復現 48.691、還是我們自己的 best。
 
-## Datasets
+--------------------------------------------------------------------------------
+## 4. 完整 LEADERBOARD（26 筆，2026-09-06 從 CSV 與磁碟重算）
+--------------------------------------------------------------------------------
 
-### v1.61-ddpo (used for all fine-tuning runs)
-- 1600 train + 400 val samples (config in data-gen/outputs/v1.61-ddpo/config.yaml)
-- algorithm=v2, seed=61
-- max_instance=400 macros per circuit
-- 每 circuit 平均 ~261 macros (synthetic data)
-- IMPORTANT: max 400 macros is **smaller than even smallest ISPD circuit
-  (adaptec1 has 543)**. So v1.61 doesn't actually match ISPD scale.
+軸別：FT = 微調權重 / FS = 從零訓練 / IT = 只改 sampler 權重不動 / FT+IT = 兩者
+artifact：該結果的 metrics.csv 是否還在磁碟上（LOST = 被 eval 目錄碰撞覆蓋，見 §8.3）
 
-### v2.61 (NOT YET USED — could be future experiment)
-- num_train_samples=0 (only val!), max_instance=1600
-- More closely matches ISPD circuit size range
-- Would need to regenerate with train samples to use for fine-tuning
+```
+ #  METHOD                                avg7    n   std     axis   artifact
+ 1  Ablation_10k (supervised 10k)         44.01   1   —       FT     LOST
+ 2  Ablation_10k + opt (Run F 復現)       44.321  1   —       FT     on disk
+ 3  SVDD_layered on Ablation_10k (Run E)  44.485  1   —       FT+IT  on disk  ← 唯一一次合併
+ 4  DDPO_v2_PPO                           44.65   1   —       FT     LOST
+ 5  SVDD_layered on large-v2              44.845  3   0.654   IT     on disk  ← 對外主打
+ 6  FromScratch_X pure 500k               45.053  1   —       FS
+ 7  FromScratch_X 1.6M                    45.078  1   —       FS
+ 8  TDS_layered on large-v2               45.081  3   0.376   IT
+ 9  FromScratch_Y (+aux) 500k             45.121  1   —       FS
+10  CoDe_layered on large-v2              45.216  3   0.469   IT
+11  AddLoss_v2                            45.236  1   —       FT
+12  AddLoss_v1                            45.387  1   —       FT     LOST
+13  Ablation_5k                           45.43   1   —       FT     LOST
+14  DDPO_v2 4-seed ensemble MEAN          45.447  4   0.880   FT
+15  DDPO_v2.3 local HPWL                  45.804  1   —       FT     LOST
+16  DDPO_v2.5 last-K                      45.857  1   —       FT     LOST
+17  FromScratch Stage2 (v2.61)            46.441  1   —       FS     on disk, 任何文件/CSV 皆無記錄
+18  DDPO_v2.4 local HPWL+legality         46.503  1   —       FT     LOST
+19  PAPER Table 10 (seed 400)             46.89   —   —       REF    已發表
+20  我們復現 large-v2 + opt (seed 300)    48.691  1   —       REF
+21  SVDD only（拔掉 opt）, large-v2       66.531  1   —       IT     negative control
+22  FlowMatch @50 ODE steps               70.028  1   —       FS     on disk，不在 CSV
+23  SVDD only on Ablation_10k             71.944  1   —       FT+IT
+24  FlowMatch @1000 steps                 77.047  1   —       FS     on disk，不在 CSV
+25  FlowMatch @10 steps                   81.245  1   —       FS     on disk，不在 CSV
+26  Ablation_10k, 完全無 guidance         84.854  1   —       FT     negative control
+```
 
-## Key learnings / insights to remember
+3-seed 明細：
+  SVDD 45.097 / 44.103 / 45.335    TDS 44.973 / 45.499 / 44.772
+  CoDe 45.361 / 44.692 / 45.596
 
-1. **Eval.py path bug**: `from_checkpoint=logs/diffusion_debug/X` gets prefixed
-   again with log_dir → double path. Always use relative `X` form. Check eval
-   log for "successfully loaded state dict for model" to confirm checkpoint loaded.
+**Oracle（跨所有結果 best-per-circuit）= 42.0899**（來源分散在 5 個方法家族：
+SVDD×2, AddLoss_v1×3, CoDe×1, DDPO ensemble×1 → 沒有任一方法 dominate）。
+  含未記錄的 fs_stage2 adaptec2 (26.65) 後 → 41.8444，**但該 placement 的
+  macro_legality 只有 0.9623，比它取代的 0.9781 更差 → 這個改進是「用合法性換來的」，
+  引用時必須註明。**
+  Legality-filtered oracle：>=0.97 → 42.354；>=0.98 → 42.814；
+  **>=0.99 不可行**（全專案 adaptec2 最高 legality 僅 0.9843）。
+  **CAVEAT：222 筆 oracle 相關資料列中有 95 筆完全沒有 macro_legality**
+  （所有 "extracted from report" 的列）→ 任何 legality-constrained 主張都是在
+  <60% 的資料上算的，必須註明。
+**Best-of-9（現成 SVDD/CoDe/TDS × 3 seeds 取 best-per-circuit）= 42.488**，
+  零 GPU 成本即可宣稱，−9.4% vs paper。
 
-2. **Pretrained large-v2.ckpt is at `../public-models/large-v2/large-v2.ckpt`**
-   relative to log_dir.
+### 前四名的差距小於雜訊 —— 重要
+Ranks 1–4 = 44.01 / 44.321 / 44.485 / 44.65，全距 **0.636 < SVDD 自己的
+seed std 0.654**，且四者全是 single seed 300。
+→ **「supervised fine-tuning 是最好的方法」這個結論目前沒有統計基礎。**
+→ 另外 44.01 與 44.321 其實是**同一組態量了兩次**（ablation_10k + opt +
+   opt-adam, seed 300），差 0.31；44.01 的 metrics.csv 已不存在，
+   **44.321 才是可復現的那一個**。
+→ 逐 circuit 雜訊更誇張：CoDe 的 adaptec2 三個 seed 從 28.36 到 38.21（35% 擺幅）。
+   **任何 single-seed 的逐 circuit 主張都沒有意義。**
 
-3. **DDPO local reward fails** (3 variants tried) because:
-   - predicted_x0 at early timesteps is ill-defined (noisy estimate)
-   - policy gradient with batch=2 has too much variance
-   - reward magnitude can explode at early timesteps (v2.4 saw 1e10)
+--------------------------------------------------------------------------------
+## 5. 實驗編年史（八條線，全部已完成 / 已結案）
+--------------------------------------------------------------------------------
 
-4. **Supervised fine-tuning is the workhorse**: Ablation 10k (44.01) beats
-   every DDPO and AddLoss variant including 108-min PPO training.
+### 5.1 DDPO — policy gradient fine-tune（run 1–5，2026-04）  【關閉】
+docs/{plan,report,next}/ddpo_*
+- run1 REINFORCE、legality_weight=0（設定失誤）→ catastrophic forgetting, val_loss→264
+- run2 PPO clipping + supervised mix + legality → **v2 = 44.65**（DDPO 最佳）
+- run3 seed ensemble + **supervised-only ablation 10k = 44.01**（發現 supervised 才是主力）
+- run4 local reward 加 legality → 46.503（legality potential 在早期 timestep 爆到 1e10）
+- run5 last-K local reward → 45.857（修好爆炸但仍不如 v2）
+- **判定：關閉。** local reward 三個變體全較差；根因已診斷（早期 timestep 的
+  predicted_x0 本身就是 ill-defined 的噪音估計；batch=2 的 policy gradient 變異太大）。
+- **副產品：發現 `from_checkpoint` 雙重路徑 bug**（§8.2），影響此前所有 eval。
 
-5. **AddLoss (ReFL-style) doesn't beat plain supervised** even with timestep
-   weighting. Hypothesis: ground truth placement already has low HPWL, so
-   the auxiliary signal is largely redundant. Direct gradient mechanism
-   itself is stable (unlike DDPO local reward), just not adding new info.
+### 5.2 AddLoss / ReFL-style 輔助 loss（run 1–2，2026-04）  【關閉】
+- v1 = 45.387，v2（timestep weighting α_t²）= 45.236
+- 訓練指標全面改善（hpwl_loss 211→149→103, legality_loss 1.93→0.18）但 ISPD 沒跟上
+- **判定：關閉，且被 from-scratch Run Y 獨立二度證偽**（§5.6）
 
-6. **Professor meeting 0403** (docs/meet/meet_0403.md) suggested:
-   - Training loss HPWL/legality (AddLoss direction — tested, marginal)
-   - Local reward in DDPO (tested, failed)
+### 5.3 SVDD-PM — inference-time particle search（Phase 1–5，2026-05-19 ~ 05-24）【成立】
+docs/{plan,report,next}/svdd_*（report 有 1–5 五份）
+- Phase 1–2：sweep K / λ / every_n / start_step_frac → 定案 (K=4, every_n=1, λ=1, α_temp=1)
+  SVDD **單獨**不能取代 opt guidance（66.531 vs 復現 48.691）→ 必須 layered
+- Phase 3：**framing 錯誤，得出偽結論「dead end」**（§3.3）
+- Phase 4：改在 large-v2 上重跑 → 45.10（single seed）
+- Phase 5：補 seed 301/302 → **44.845 ± 0.654，3/3 seeds 勝 paper −4.4%**
+- bigblue4 是最大受益 circuit（3-seed 一致 −10.8%）；bigblue3 對 K-particle 噪音
+  特別敏感（std 5.34，其他 circuit < 2.6）→ single seed 會看到假的「結構性退步」
+- **⚠️ `svdd_report_3.md` §1 與 §11 至今仍寫著「inference-time search 正式 dead end」，
+  從未修訂，與 report_5 直接矛盾。先開那個檔的人會得到完全相反的結論。**
+  同樣作廢但仍在磁碟上的還有 `svdd_next_2.md` §3.1。
 
-7. **Val loss ≠ ISPD performance**. In Ablation 10k, val loss went UP
-   (0.10→0.17) from step 1000 to 10000 but ISPD improved. Slight
-   overfitting to v1.61 helps ISPD.
+### 5.4 CoDe — blockwise best-of-N（2026-05-24/25）  【成立】
+- 45.216 ± 0.469（3 seeds），與 SVDD 統計上等價
+- 只比 SVDD 快 17%（因為 wall-clock bottleneck 是 opt 的 20 次 inner SGD，不是 K-particle）
+- bigblue4 顯著輸 SVDD 4.42（大 circuit 偏好「每步都探索」而非「每 100 步 fork 一次」）
+- seed 302 的 bigblue3 legality 掉到 0.929（argmax 較激進，偶爾掉進 legalizer 修不回來的洞）
 
-8. **Seed variance is significant** (adaptec2: 29.26-36.61 across 4 seeds).
-   Multi-seed reporting recommended.
+### 5.5 TDS — twisted SMC sampler（2026-05-25）  【成立】
+- 45.081 ± 0.376（3 seeds），**方差最低**：bigblue3 std 從 SVDD 的 5.34 → 0.16（−97%）
+- ESS-based resample 讓不同 seed 殊途同歸；賣點是「95% CI 比 SVDD 窄 40%」
+- 順手修掉 codebase latent bug：`reverse_guidance_opt_force` 的
+  `alpha_cost.backward()` 在 B>1 不能跑（改 `.mean()`，B=1 行為不變）
 
-9. **bigblue2 (23k macros) is the only circuit losing to paper**:
-   - Our methods: HPWL 57-66
-   - Paper: 38.8 (-46%)
-   - Reason: V×V matrix for 23k macros needs 30-35 GB VRAM; we have 24 GB
-   - skip_guidance_threshold=10000 disables guidance for bigblue2, leaving
-     only legalization
-   - Paper likely uses larger GPU (40GB+) or cluster-aware guidance
+**§5.3–5.5 的共同結論**：三個機制上完全不同的 selection rule（per-step softmax /
+per-100-step hard argmax / SMC importance + ESS）收斂到同一個天花板
+（−3.6% ~ −4.4%，全距 0.79% vs seed std 0.4–0.6）→ **搜尋預算重要，選擇規則不重要**。
+這是乾淨且可發表的負面結論。negative controls 也齊備（SVDD 取代 opt = 66.531；
+完全無 guidance = 84.854）。
 
-10. **System CPU contention**: Other users (ansys.e, redhawk+) can crater
-    eval speed by 5-13x. Check `uptime` and `top` if eval seems abnormally
-    slow.
+### 5.6 From-scratch — 隨機初始化訓練（2026-05-26 ~ 06-12）  【有價值，不再投入 compute】
+docs/plan/from_scratch_plan_1.md, docs/report/from_scratch_report_1.md
+- Dataset v1.61-fs.61（4600 train + 200 val, max 400 macros），batch=32（被 PyG bug 逼的）
+- **Run X（pure denoising, 500k）= 45.053** ← 唯一不碰 paper checkpoint 就勝過 paper 的方法，
+  且只用了 paper 3M 步的 1/6
+- **Run Y（從 step 0 就加 HPWL/legality aux, 500k）= 45.121**，Δ=+0.068 → aux 無效
+- Run X 延長到 1.6M = 45.078（沒有進一步改善）
+- **Stage 2（paper 式 v2.61 二階段 fine-tune）= 46.441 → 回歸 +3.1%**，
+  由 bigblue4 129.23 → 145.60（+12.7%）驅動。**這是關於 paper 自己 two-stage recipe
+  的負面結果，目前在任何報告、兩個 CSV、PROGRESS.md 中都不存在**（§6.1）
+- 建議：寫成論文的一節，但不值得再投 compute（延到 3M 約 2.3 天/變體）
 
-## Tools user wants used
+### 5.7 ISPD2005 極限分析（純分析，2026-07-06）  【已結案】
+docs/plan/ispd_limit_plan_1.md, docs/report/ispd_limit_report_1.md
+- 回答教授 meet_0620 §3「是不是已經到極限」→ **沒有**。Oracle 42.09 比當時最佳
+  單一方法還低 4.4%，比 paper 低 10.2%
+- 每個 circuit 的 min 與 median 差 5–12% → **seed variance 仍是最大的未開採資源**，
+  且它大於方法之間的真實差距（這解釋了「為什麼所有方法都擠在 44–47」）
+- Part B（adaptec1/bigblue1 純優化下界）**從未執行**
 
-- TodoWrite for multi-step tasks
-- Background bash for long-running experiments and checks (with sleep + grep +
-  tail). Use `run_in_background: true` for training/eval; you'll get a
-  notification when it completes.
+### 5.8 Flow Matching（2026-07-06）  【關閉】
+docs/{plan,report,next}/flowmatch_*
+- 同資料同架構同預算（v1.61-fs, 500k, batch=32）對照 DDPM Run X 45.053
+- @50 ODE steps = **70.028**（最佳）；@1000 = 77.047；@10 = 81.245
+- 品質-步數關係是**反的**（步數越多越差）→ 確定性 ODE 路徑上 guidance 會 over-shoot，
+  沒有 stochastic noise 洗掉累積偏差
+- 真正死因是 **OOD 泛化**：V<=560 貼平 DDPM，V>=723 起全面崩（bigblue4 268 vs 129）。
+  訓練資料 max 400 macros，DDPM 外插到 8170 只小退，FM 直接崩
+- 唯一亮點：小 circuit 用 10–50 步達近 DDPM 品質，gen time 減半（latency-sensitive
+  應用可回收）
+- **判定：關閉，並連帶關閉 drifting model**（同屬 few-step deterministic 家族，
+  預期同樣的 OOD 弱點）
 
-## Recent discussion / where we left off
+### 5.9 Data augmentation（2026-07-08）  【訓練完成，**從未 eval**】→ 見 §6.2
+### 5.10 EDA-generated dataset  【從未動工，建議正式關閉】→ 見 §7 closed
 
-User just finished asking conceptual questions to prepare for professor meeting:
-- Confirmed supervised fine-tuning mechanism (standard MSE on noise prediction)
-- Confirmed how multi-term loss is added (one sum, one backward, one step)
-- Confirmed DDPO vs AddLoss difference (policy gradient vs direct gradient)
-- Realized v1.61 (max 400 macros) is actually SMALLER than ISPD circuits,
-  so "v1.61 closer to ISPD" assumption was wrong
-- Wrote meeting report (in chat, not committed) for the professor
+--------------------------------------------------------------------------------
+## 6. OPEN / 未收割（磁碟上有東西，文件裡沒有）
+--------------------------------------------------------------------------------
 
-User is now migrating to a new server / session and wants to continue work.
+### 6.1 FromScratch Stage 2 的 46.441 —— 全文件無記錄
+- eval 於 2026-06-12，`from_scratch_plan_1.md` line 306 的 Step 7 至今未勾選
+- ckpt: `logs/diffusion_debug/v2.61.fs_p1_X_stage2_b32.61/latest.ckpt`
+- metrics: `logs/diffusion_debug/ispd2005-s0.fs_stage2_full_part{1,2}.300/metrics.csv`
+- 逐 circuit（hpwl_rescaled/100, seed 300, 括號為 macro_legality）：
+      idx0 adaptec1   9.31  (0.99139)
+      idx1 adaptec2  26.65  (0.96230)   ← 全專案最低的 adaptec2，但 legality 最差
+      idx2 adaptec3  55.28  (0.99668)
+      idx3 adaptec4  53.22  (0.99770)
+      idx4 bigblue1   2.68  (0.99563)
+      idx6 bigblue3  32.35  (0.99736)
+      idx7 bigblue4 145.60  (0.99016)
+      avg7 = 46.441（Stage 1 是 45.053 → **回歸 +3.1%**）
+- 行動：補進兩個 CSV + 寫 `docs/next/from_scratch_next_1.md`（零 GPU）
 
-## Pending decisions / open directions
+### 6.2 DataAug Run C —— 訓練完成，**從未 eval**（專案唯一「訓練完成零結果」的 GPU run）
+- ckpt: `logs/diffusion_debug/v1.61-fs.61.aug_p1_C_dihedral_dropout_500k.61/latest.ckpt`
+  （75,655,510 B，2026-07-08 15:12 完成；best.ckpt 與 step_*.ckpt 也都在）
+- 已確認 `logs/diffusion_debug/` 內**沒有任何 `ispd2005-s0.aug*` 目錄**
+- **判定規則已於 `dataaug_plan_1.md` §4 預先登記**（對照基準 = Run A/FromScratch_X 45.053）：
+      < 44.5        → augmentation 有效，multi-seed 驗證後併入所有後續訓練
+      44.5 – 45.05  → 邊際，記錄即可
+      > 45.05       → augmentation 有害（synthetic data 已夠多樣），關閉此方向
+- **歸因注意**：Run C = dihedral **且** edge_dropout=0.1 兩個變因同時開。
+  Run B（僅 dihedral）在 2026-07-08 01:27 於 PyG `add_self_loops` scatter 崩潰，未重跑
+  → 若 Run C 有效，無法區分是哪個變因的功勞
+- 成本：~1.2 hr GPU。也是對教授 meet_0620 建議 (1) 的直接回應
 
-These were laid out in the last meeting report sent to the professor (see
-recent docs/meet/ if a new meeting record is created). All are unexplored:
+### 6.3 fine-tuning × inference-search 的組合 —— 只在單一 seed 上測過一次就被關閉
+- 唯一一次：Run F（ablation_10k + opt）= **44.321** vs Run E（+ svdd_layered）= **44.485**，
+  Δ = **+0.164**，seed 300 單跑
+- 但 SVDD 在同樣 7 circuits 上的 across-seed std = **0.654**，是該差值的 **4.0 倍**
+- 逐 circuit 看更糟：Run E vs F 是 3 勝 4 敗，總和由兩個 circuit 主導 ——
+  adaptec4 −2.96（SVDD 大勝）與 bigblue4 +4.07（而 SVDD 的 bigblue4 seed std
+  正好 4.42，即這一敗恰等於一個雜訊單位）
+- 這個 n=1 結果被寫成 **`svdd_next_3.md` §5.1 的「headroom 假說」禁令**，再被
+  `tds_next_1.md` §4 與 `code_next_1.md` §4 抄成「不要在 fine-tuned checkpoint 上測試」
+  → **CoDe 與 TDS 從未碰過任何 fine-tuned checkpoint**（已逐一檢查 94 個 eval dir 的
+  `from_checkpoint`，全部是 `large-v2.ckpt`）
+- 諷刺的是 `svdd_next_3.md` §5.2 自己剛立下「每個主要結論至少 3 seeds」的規矩，
+  而這條禁令本身從未達到那個標準
+- **重測成本 ~7 hr GPU，零實作**（Run E / Run F 各補 seed 301, 302）。
+  若可疊加，fine-tune × search × best-of-N 直指 ~42.5
 
-A. **Best-of-N self-improvement** — use multi-seed best output as training
-   label, then re-fine-tune. Theoretical upper bound: 43.89.
+### 6.4 其他未收割
+- 三個 flow-matching 結果（70.028 / 77.047 / 81.245）已寫入報告但**不在兩個 CSV 內**
+- best-of-N 表：現成 9 個 search run 的 best-per-circuit = **42.488**，零 GPU 即可算
+- supervised step sweep 15k / 20k / 30k：`ddpo_next_3.md` 列為 priority 1，
+  **從未執行**。5k→45.43, 10k→44.01，曲線是在還在下降時被砍掉的；每個變體訓練僅 ~17 min
+- bigblue2 在 32 GB 上重試 full guidance（唯一從未勝過 paper 的 circuit）
+- paper baseline 補到 3–4 seeds（目前 48.691 是 n=1 且原始檔已被覆蓋；
+  沒有它就做不了配對比較）
+- **從未打開過的方向**（`docs/plan/init_plan.md` 內，被所有 next 文件遺漏）：
+  方向四 Graph Transformer backbone（`networks/gt.py` 已在 repo 內；動機是
+  long-range dependency，而 HPWL 正是 long-range 的）；
+  方向五 GNN conv layer 置換（GCN/SAGE/GIN/GAT/Transformer/Gated 皆已支援）
+  ← **全專案最便宜的未試想法，只是改 config**；
+  方向六 iterative clustering（`policies.iterative_clustering` 已實作）
 
-B. **Cluster-aware guidance for bigblue2** — implement hierarchical guidance
-   to handle 23k macros within 24 GB. Solves the one circuit we lose paper.
+--------------------------------------------------------------------------------
+## 7. CLOSED — 已關閉的方向與殺死它的證據
+--------------------------------------------------------------------------------
 
-C. **More supervised training** — try 15k, 20k steps. Cheap to check if
-   ceiling is higher than 44.01.
+1. **DDPO 與所有 local-reward 變體**
+   5 個 run。v2 PPO 44.65 是這條線最佳，但三個 local reward 變體全較差
+   （45.804 / 45.857 / 46.503）。根因已診斷：早期 timestep 的 predicted_x0 是
+   ill-defined 的噪音估計、batch=2 的 policy gradient 變異過大、reward 量級可爆到 1e10。
 
-D. **Stacking: AddLoss starting from Ablation 10k checkpoint** — instead of
-   from large-v2. Tests if a polish on top of best supervised helps.
+2. **AddLoss / ReFL-style 輔助 loss —— 被兩個獨立實驗證偽**
+   (a) fine-tune 端：AddLoss v1 45.387 / v2 45.236，訓練指標全面改善但 ISPD 沒跟上；
+   (b) **從 step 0 端**：from-scratch Run Y 45.121 vs Run X 45.053，Δ=+0.068。
+   加上 DDPO local reward 的失敗，**三線獨立收斂**到同一個結論：
+   **輔助 HPWL/legality 訊號對這個任務是冗餘的，因為 ground-truth placement 本身
+   已經是低 HPWL 且合法的**。這是乾淨、可發表的負面結果。
 
-E. **Use v2.61 dataset** (after generating train samples) — its max_instance
-   1600 is closer to ISPD scale than v1.61's 400. Could test "does dataset
-   scale matter for ISPD transfer".
+3. **Flow matching，連帶 drifting model**
+   同預算 70.028 vs DDPM 45.053。死因是 OOD 泛化（V>=723 起全面崩），不是 guidance
+   調參問題 —— 差距 25 個 HPWL 單位不是加長訓練或調 guidance 的量級。
+   Drifting model 同屬 few-step deterministic 家族，預期同樣弱點，一併關閉。
 
-F. **Apply for A100 40/80 GB GPU** — would unblock bigblue2 + larger DDPO
-   batch sizes.
+4. **EDA-generated dataset**（`eda_dataset_plan_1.md`，教授 meet_0620 建議 4）
+   四個方向中工程量最大（DREAMPlace 安裝 + format converter，2–3 天），而且
+   **它自己的 plan §4 就預先登記了 kill test**：synthetic 原 label 是 by-construction
+   near-optimal，EDA label 品質若更差反而傷。在其他更便宜的方向都還沒收割完之前，
+   正式關閉。
 
-G. **Write the paper** — current results already beat paper by 6.1%, could
-   be publishable depending on how bigblue2 is framed.
+5. **申請更大的 GPU**
+   舊 context.txt 的 pending item F。**它的動機是 DDPO 的 batch size，而 DDPO 已死。**
+   而且 GPU 已經自己換成 32.6 GB 了（§2）。bigblue2 的 guidance OOM 現在是
+   「在新 GPU 上重量一次」的問題，不是採購問題。
+
+**不建議完全關閉的**：from-scratch。Run X 以 1/6 步數從隨機初始化達 45.053，
+是唯一不碰 paper checkpoint 就勝過 paper 的方法，適合作為論文的一節，
+但不值得再投入 compute。
+
+--------------------------------------------------------------------------------
+## 8. 已知問題 / GOTCHAS
+--------------------------------------------------------------------------------
+
+### 8.1 【NEW, BLOCKER】GPU / torch 不相容 —— 見 §2
+sm_120 vs arch_list<=sm_90。`torch.cuda.is_available()` 騙人，會回 True。
+修好後**必須先重跑 Run F 驗證（預期 44.321）**再信任任何新數字。
+
+### 8.2 `from_checkpoint` 雙重路徑 bug（老坑，仍然存在）
+`eval.py` / `train_graph.py` 都做 `os.path.join(cfg.log_dir, cfg.from_checkpoint)`。
+`log_dir=logs/diffusion_debug`，所以傳
+`from_checkpoint=logs/diffusion_debug/X/latest.ckpt` 會變成
+`logs/diffusion_debug/logs/diffusion_debug/X/latest.ckpt` → **silent fail，
+模型是隨機初始化跑完的**。
+一律用**相對於 log_dir** 的路徑：
+    從 saved run:  `from_checkpoint=v1.61-ddpo.<method>.61/latest.ckpt`
+    從 pretrained: `from_checkpoint=../public-models/large-v2/large-v2.ckpt`
+**每次都要驗證 eval log 內出現字串 `successfully loaded state dict for model`**；
+若出現 `no checkpoint at ... found` 就是路徑錯了。
+
+### 8.3 eval 目錄碰撞 —— 已造成 6 筆結果永久遺失
+run dir 命名是 `<task>.<method>.<seed>`，**不含 from_checkpoint**，導致七個
+fine-tuning eval 全部寫進同一個 `ispd2005-s0.eval_macro_only.300/`，只有最後一個
+（AddLoss v2）倖存。Ablation_10k (44.01)、DDPO v2 (44.65)、AddLoss v1、
+DDPO v2.3/2.4/2.5 的原始 metrics 已遺失。
+**checkpoint 都還在，所以是重新 eval 而非重新訓練**（除了 §4 標 LOST 且 ckpt 也沒了的）。
+修法：讓 from_checkpoint 進入 run dir 名稱（~20 min）。
+
+### 8.4 Hydra override 語法
+`guidance@_global_=opt`、`legalizer@_global_=opt-adam`、`mode@_global_=ddpo`
+（**必須有 `@_global_`**）。新 key 要 `+` prefix：`+start_sample=5`、
+`+skip_guidance_threshold=10000`。
+
+### 8.5 ISPD task 名稱
+使用者 parse 好的資料在 `datasets/graph/ispd2005-s0/`，用 `task=ispd2005-s0`。
+code 內對 `dataset_name == "ispd2005"` 的特例（把 is_ports 歸零）**不會**觸發。
+
+### 8.6 bigblue2（23,084 macros）
+Guidance 的 V×V 矩陣在舊的 24 GB 上必 OOM → 一直用 `+skip_guidance_threshold=10000`
+自動跳過 guidance（**只跳 guidance，不跳 legalization**；legalization 本身塞得下，
+但要 ~100 min）。因此 bb2 一直是 57–66 vs paper 38.8，**是唯一從未勝過 paper 的 circuit**。
+新的 32.6 GB 使 full guidance 變成邊緣可行（§2），值得重試一次。
+技術提示：`guidance.py:49` 的 `legality_guidance_potential_tiled`（block_size=16384）
+已在 `legalization.py:52,148` 與 `sc_placement.py:281` 實際使用（**不是死碼**），
+但 guidance 路徑（`models.py:1916, 1954`）與三個 search reward（`:1621, :1726, :1801`）
+走的是**未 tiled 的版本**。改走 tiled 版是低風險改動，因為該 kernel 已在
+legalization 上實戰驗證過。
+
+### 8.7 PyG batched edge_index bug
+`networks/layers/wrapper.py` 對 B>32 有結構性問題，觸發
+`gatv2_conv.add_self_loops` 的 scatter index 越界。
+- batch=64 訓練會炸 → from-scratch 全系列被迫用 batch=32（half-exposure caveat）
+- SVDD K=8 同一個 bug → 一律用 K=4 規避
+- DataAug Run B 就是死在這個（`add_self_loops` scatter crash）
+- commit `ad5553a` 加了 BatchWrapper chunking 修正，但**升級 torch 後要重新確認**
+
+### 8.8 系統 CPU 競爭會汙染所有 runtime 數字
+其他 user（ansys.e, redhawk+）可讓 eval 慢 5–13×。GPU 可能顯示 11% util 但實際是
+CPU-bound。eval 異常慢時先看 `uptime` 與 `top`。
+**這已經汙染了記錄中的 generation_time，直接引用會產生物理上不可能的表**：
+baseline adaptec1 = 419.6 s（2026-03）vs Run F 同組態 133.4 s（2026-05），3.1× 差距。
+照抄的話 SVDD (132.5 s) 會看起來比 opt-only (419.6 s) 還快，而它每個 reverse step
+要多做 K=4 次前向 —— 審稿人會直接拒。
+**誠實的同日同 checkpoint 量測**：Run F 3079 s vs Run E 3455 s = **+12.2% overhead**。
+每 seed 7-circuit 實測：CoDe 43.5 min、opt-only 51.3 min、SVDD 57.6 min、
+TDS 95.6 min（其中 81 min 花在 bigblue4 一個 circuit）。
+
+### 8.9 generate_parallel.py 的 num_workers
+預設 64 會 OOM 並踢掉 SSH。用 4，或改用單進程的 generate.py。
+
+### 8.10 `placements/macro-ispd/` 不是我們跑的
+那是 **paper 作者**的結果（checkpoint `v2_gmix1.6_2x...ckpt`），與 paper Table 10 完全吻合。
+
+### 8.11 Val loss ≠ ISPD 表現
+Ablation 10k 的 val loss 從 step 1000 到 10000 是**上升**的（0.10→0.17），
+但 ISPD 反而變好。對 v1.61 稍微 overfit 有助於 ISPD transfer。
+→ 不要用 val loss 當 early stopping 訊號。
+
+### 8.12 v1.61 訓練資料比 ISPD 最小的 circuit 還小
+v1.61 系列 max_instance=400 macros，而 adaptec1 有 543。**「v1.61 比較接近 ISPD 尺度」
+這個假設是錯的**。v2.61 的 max_instance=1600 才涵蓋大部分 circuit。
+所有 ISPD 結果本質上都是 OOD extrapolation（這也是 flow matching 的死因）。
+
+--------------------------------------------------------------------------------
+## 9. 統計紀律（踩過坑才立的規矩）
+--------------------------------------------------------------------------------
+
+1. **每個主要結論至少 3 seeds。** 來源：Phase 4 的 single-seed bigblue3 = +14.2%
+   曾催生三個「SVDD 結構性弱點」假說，3-seed 之後變成 −3.0%（純 bad luck）。
+   本專案目前**違反這條規矩最嚴重的地方就是 leaderboard 前四名**（全部 n=1，
+   全距 0.636 < std 0.654）與 §6.3 的那條禁令。
+2. **n=3 要用 t 不是 z。** `svdd_report_5.md` 的 95% CI [44.11, 45.59] 用了 z=1.96；
+   正確的 t 區間（t_.975,df=2 = 4.303）是 **[43.22, 46.47]**。
+   結論仍成立（46.47 < 46.89），但邊際比宣稱的薄很多。
+3. **同 seed 的比較要用配對檢定。** `code_report_1.md` 用非配對檢定判 CoDe vs SVDD
+   「不顯著 (t≈0.80)」；配對下 SVDD 三個 seed 全勝（+0.264/+0.590/+0.261），
+   paired t = 3.40, p≈0.077 → 文件**低估**了 SVDD 對 CoDe 的優勢。
+   （TDS vs SVDD paired t = 0.40，這兩個才是真的無法區分。）
+4. **不要事後推翻預先登記的判定門檻。** 已經發生兩次：
+   `addloss_plan_2.md` 把 44.5–45.39 列為「繼續」，結果 45.236 落在區間內卻仍被放棄；
+   `ddpo_plan_5.md` 設 >=45.80 為「放棄」，v2.5 得 45.857 只超過 0.057 就直接放棄，
+   沒試 contingency K=10。
+5. **bigblue2 會翻轉結論的正負號。** Paper 的 8-circuit 平均是 45.88；我們 bb2≈57 時
+   8-circuit 變成 SVDD 46.37 / TDS 46.57 / CoDe 46.69，**全部輸給 paper +1.1%~+1.8%**。
+   損益兩平需要 bb2 <= 53.1 / 51.5 / 50.5；若能達 paper 的 38.8 則是
+   44.09 / 44.30 / 44.42（−3.2%~−3.9%）。**任何 8-circuit 表都必須先解決 bb2。**
+6. **論文的致命缺口：沒有 matched-compute best-of-N 對照。** SVDD/CoDe/TDS 用 K=4，
+   審稿人必問「那把 paper 的 opt guidance 跑 4 個 seed 取最好呢？」——從未跑過，
+   因為 opt-only baseline 只有一個 seed。若 best-of-4 opt-only 落在 44.8 附近，
+   搜尋的貢獻就縮水成「同品質、1.12× 而非 4× 計算量」，是完全不同且弱很多的論文。
+   **成本為零**（同 4 個 baseline run 同時當 baseline 與對照）。
+
+--------------------------------------------------------------------------------
+## 10. 程式碼改動與 GIT 狀態
+--------------------------------------------------------------------------------
+
+**GIT 已修復（2026-09-06/07）**：HEAD = `300eb49`，已 push。
+在此之前 HEAD 停在 `40a396d`（2026-04-15）近 5 個月，753 行 tracked 改動 +
+約 7,680 行 untracked 完全沒有備份 —— 一次誤觸 `git checkout .` 就會毀掉三個
+勝過 paper 的結果。現已解除。
+
+本輪 commit：
+    45f2621  feat(sampling): SVDD/CoDe/TDS inference-time search samplers + FlowMatchingModel
+    ad5553a  fix(wrapper): chunk BatchWrapper forward to avoid PyG scatter crash on large B*E
+    77f7b72  feat(data): dihedral D4 augmentation + edge dropout for graph training
+    300eb49  docs: SVDD/CoDe/TDS, from-scratch, flow-matching and ISPD-limit tracks
+
+**⚠️ CLAUDE.md 第 35 行的標題「Code Modifications (by Claude, all committed)」
+在 2026-09-06 之前是錯的；現在才是對的。**
+
+主要改動位置（累積）：
+- `diffusion/ddpo.py`：num_timesteps / clip_epsilon / supervised_weight /
+  local_reward_weight / local_reward_every / local_reward_last_k；PPO clipping、
+  log-prob scale normalization、mixed supervised loss、last-K local reward
+- `diffusion/models.py` `ContinuousDiffusionModel.loss()`：hpwl_weight /
+  legality_weight / use_timestep_weighting（ReFL-style aux on predicted_x0）
+- `diffusion/models.py` `reverse_samples(output_log_prob=True)`：回傳 per-step
+  log probs 與 predicted_x0 list（DDPO 用）
+- `diffusion/models.py`：SVDD / CoDe / TDS 三個 sampler + `svdd_layer_opt` kwarg +
+  `FlowMatchingModel`；`reverse_guidance_opt_force` 的 B>1 正確性修正
+- `diffusion/networks/layers/wrapper.py`：BatchWrapper chunking
+- `diffusion/train_graph.py`：上述參數的 glue + dihedral augmentation
+- `diffusion/eval.py`：`+start_sample=N`、`+skip_guidance_threshold=N`
+- `diffusion/configs/guidance/{svdd,svdd_layered,code_layered,tds_layered}.yaml`
+  ← **沒有這四個 YAML，sampler 在 Hydra 下根本叫不出來**
+- `diffusion/configs/mode/ddpo.yaml`：legality_weight 0.0 → 0.5
+
+--------------------------------------------------------------------------------
+## 11. 標準 EVAL 指令
+--------------------------------------------------------------------------------
+
+（`from_checkpoint` 會被接在 `log_dir=logs/diffusion_debug` 之後，路徑必須相對 —— §8.2）
+
+ISPD2005 macro-only，從 paper pretrained（= 我們的 baseline 48.691）：
+
+    PYTHONPATH=. python diffusion/eval.py \
+      method=eval_macro_only \
+      task=ispd2005-s0 \
+      from_checkpoint=../public-models/large-v2/large-v2.ckpt \
+      legalizer@_global_=opt-adam \
+      guidance@_global_=opt \
+      num_output_samples=8 \
+      +start_sample=0 \
+      +skip_guidance_threshold=10000 \
+      model.grad_descent_steps=20 \
+      model.hpwl_guidance_weight=16e-4 \
+      legalization.alpha_lr=8e-3 \
+      legalization.hpwl_weight=12e-5 \
+      legalization.legality_potential_target=0 \
+      legalization.grad_descent_steps=20000 \
+      macros_only=True \
+      logger.wandb=false
+
+從 fine-tuned checkpoint：把 from_checkpoint 換成
+`v1.61-ddpo.ablation_supervised_10k.61/latest.ckpt` 這種相對路徑。
+Inference-time search：把 `guidance@_global_=opt` 換成
+`svdd_layered` / `code_layered` / `tds_layered`。
+
+--------------------------------------------------------------------------------
+## 12. 參考表
+--------------------------------------------------------------------------------
+
+### ISPD2005 macro 數與可跑性（可跑性欄位是舊的 24 GB 時代，新 GPU 未重測）
+| idx | Circuit  | Macros | Guidance? | Legalization? |
+|-----|----------|-------:|-----------|---------------|
+| 0   | adaptec1 |    543 | ok        | ok            |
+| 1   | adaptec2 |    566 | ok        | ok            |
+| 2   | adaptec3 |    723 | ok        | ok            |
+| 3   | adaptec4 |  1,329 | ok        | ok            |
+| 4   | bigblue1 |    560 | ok        | ok            |
+| 5   | bigblue2 | 23,084 | OOM (V×V) | ok (~100 min) |
+| 6   | bigblue3 |  1,298 | ok        | ok            |
+| 7   | bigblue4 |  8,170 | ok        | ok (~25 min)  |
+
+### Paper Table 10（macro-only ISPD2005, HPWL ×10^5）
+| Circuit  | MaskPlace | WireMask-BBO | ChiPFormer | Diffusion (Paper) |
+|----------|-----------|--------------|------------|-------------------|
+| adaptec1 | 8.57      | 5.81         | 6.75       | 9.19              |
+| adaptec2 | 77.7      | 54.5         | 63.8       | 31.0              |
+| adaptec3 | 108       | 59.2         | 73.2       | 54.4              |
+| adaptec4 | 91.9      | 62.7         | 85.8       | 54.5              |
+| bigblue1 | 3.11      | 2.12         | 3.05       | 2.64              |
+| bigblue2 | Timeout   | 186          | 85.8       | 38.8              |
+| bigblue3 | 84.0      | 66.2         | 79.2       | 35.9              |
+| bigblue4 | Timeout   | 798          | 548        | 141               |
+| Avg (8)  | —         | 154          | 116        | 45.88             |
+| Avg (7, no bb2) | —  | —            | —          | **46.89**         |
+
+文獻中無人做到 42 以下；diffusion 系是目前唯一在 45 級別的方法家族。
+
+### 與 paper eval 流程的差異
+- **seed**：我們 300，paper 400 —— 逐 circuit 差異的主要來源
+- **bigblue2**：paper 跑 full guidance（推測 >24 GB 或 cluster），我們一直跳過
+- 其餘超參數與 paper 相同（guidance steps=20, legalization steps=20000, ...）
+
+### Datasets
+- `v1.61-ddpo`：1600 train + 400 val，max_instance=400，用於所有 fine-tuning run
+- `v1.61-fs.61`：4600 train + 200 val，max_instance=400，用於 from-scratch /
+  flow-matching / dataaug
+- `v2.61`：max_instance=1600，較接近 ISPD 尺度，用於 from-scratch Stage 2
+  （結果是回歸，見 §6.1）
+
+--------------------------------------------------------------------------------
+## 13. 其他仍然過期的文件（讀到時要警覺）
+--------------------------------------------------------------------------------
+
+1. **`CLAUDE.md`**：GPU 寫 24 GB（§2）；「Ablation 10k beats paper by 6.1%」的
+   framing 已作廢（§3.2）；「all committed」標題在 2026-09-06 前是錯的
+2. **`svdd_report_3.md` §1/§11**：仍寫「inference-time search 正式 dead end」，
+   與 report_5 直接矛盾，**尚未修訂**（誤導風險最高的一份）
+3. **`svdd_next_2.md` §3.1**：已被 next_3 §4 宣告作廢，但檔案仍在
+4. **`memory/`**：`memory/MEMORY.md` 與 `memory/project_experiment_ranking.md`（4/18）
+   仍宣稱 leaderboard 止於 44.01；`memory/project_svdd_direction.md`（5/24）說 SVDD
+   「implementation pending」→ **新 session 會從兩個獨立來源得到 4 個月前的舊圖像**，
+   本檔更新後應一併同步 memory/
+5. **三處排名列印順序與數值不符**（`ddpo_report_5.md`、`svdd_report_3.md` §4、
+   `from_scratch_report_1.md` §4）→ 不要把 rank 順序當數值順序讀
+6. **`from_scratch_report_1.md` §3** 內文說「Run X 勝 5/7」，其自己的表格是 4 勝 3 敗
+
+--------------------------------------------------------------------------------
+## 14. 下一步（完整排序見 `docs/next/comeback_next_1.md` §8）
+--------------------------------------------------------------------------------
+
+P0（不做完不能做別的）
+  0.1  修環境：新 env 升級 torch >= 2.7/cu128            1–2 hr
+  0.2  升級後重跑 Run F 驗證（預期 44.321）              ~1 hr GPU
+       ← 不做這步，升級後所有數字與磁碟上 26 筆舊結果不可比
+
+P1（零 GPU 或極低成本）
+  1.1  修 `svdd_report_3.md` §1/§11 的 dead-end 錯誤結論   15 min
+  1.2  把 4 筆磁碟上未記錄的結果補進兩個 CSV（fs_stage2 +
+       三個 flow-matching），oracle 更新為 41.844 並附 legality 註記   1 hr
+  1.3  寫 `docs/next/from_scratch_next_1.md`（Stage 2 回歸 45.05→46.44） 30 min
+  1.4  同步更新 `memory/`（本檔已重寫）                    30 min
+  1.5  算 best-of-9 表（= 42.488，−9.4% vs paper）         30 min
+  1.6  修 eval 目錄命名讓 from_checkpoint 進 dir 名，防止再覆蓋  20 min
+
+P2（GPU，全部卡在 P0 之後，依價值排序）
+  2.1  **在 fine-tuned checkpoint 上重測 search，3 seeds**（Run E/F 各補 301,302）
+       ~7 hr GPU，零實作 ← **若只能選一件 GPU 工作，選這個。**
+       它是唯一可能突破 44 而不需要新想法的路，且無論結果如何都產出可發表的 ablation，
+       並決定論文框架是「search 取代 fine-tuning」還是「search 與 fine-tuning 可組合」
+       （後者是強很多的論文）
+  2.2  best-of-N 形式化為推論協定（SVDD best-of-3 = 43.11，配 legality 下限） ~3.5 hr
+  2.3  **eval DataAug Run C**（判定規則已預先登記，§6.2）  ~1.2 hr
+  2.4  supervised step sweep 15k/20k/30k（從未執行，每個訓練僅 ~17 min）  ~50 min + eval
+  2.5  bigblue2 在 32 GB 上重試 full guidance             一次 eval，可能 OOM
+  2.6  paper baseline 補到 3–4 seeds（做配對比較的前提）    ~3.5 hr
+  2.7  FreeDoM time-travel 疊在 TDS 上（文件自估僅 −0.5~−1%） 半天 + 3.5 hr
 
 ================================================================================
 END CONTEXT

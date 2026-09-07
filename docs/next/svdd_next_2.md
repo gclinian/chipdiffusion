@@ -1,3 +1,19 @@
+> # ⚠️ 更正聲明 CORRECTION（2026-09-07）— §3.1 已作廢
+>
+> **本文件 §3.1 已由 `docs/next/svdd_next_3.md` §4 明文宣告「作廢」。** 依專案慣例本文**不改寫**，原文全部保留供歷史追溯，僅加註。
+>
+> §3.1 斷言「**Paper 用 ablation_10k + opt guidance + opt-adam legalization → 44.01**」── **這句是錯的**。`ablation_supervised_10k` 是**使用者自己 fine-tune 出來**的 checkpoint，不是 paper 的。Paper 真正的 baseline 是 **`large-v2` + opt = 46.89（paper 公告, seed 400）／ 48.691（我們環境重現, seed 300）**；44.01 反而是我們**贏** paper 6.1% 的自家最佳結果。
+>
+> **後果**：這個誤植直接 propagate 進 `docs/plan/svdd_plan_3.md` §1 與 `docs/report/svdd_report_3.md`，害 Phase 3 整場實驗都在跟錯的對照組比，得出偽結論「inference-time search（SVDD/CoDe/TDS 整族）正式 dead end」。改在 paper 真正的 large-v2 上重跑後（CSV 重算確認）：**SVDD_layered 3-seed avg = 44.845 ± 0.654（45.097 / 44.103 / 45.335），3/3 seeds 全贏 paper 46.89**；TDS_layered 45.081、CoDe_layered 45.216 亦同樣 3/3 全贏。見 `docs/report/svdd_report_5.md` §8。
+>
+> **另**：§4「保留的：ablation_supervised_10k 為 init checkpoint」這個決定也被 `svdd_next_3.md` §4 點名要重排 —— 正是這個選擇讓 SVDD 沒有 search headroom；當時若直接在 large-v2 上做 plan_3 可以省掉一整個 phase。§6 決策樹中「持平 → inference-time search 路線正式放棄」的分支同樣不再有效。
+>
+> **本文件仍然有效的部分**：§2、§3.2-3.5（GPU contention、macros_only 加速、K=4 記憶體、bigblue3 headroom 觀察）、§5、§7 未受影響。
+>
+> 詳見 `docs/next/svdd_next_3.md` §3、§4、§5.1。
+
+---
+
 # SVDD Phase 2 回顧（next_2）
 
 > Report: `docs/report/svdd_report_2.md`
@@ -21,6 +37,11 @@ SVDD-PM 在 **deployment-fair 條件**（ablation_10k + opt-adam legalization）
 ## 3. 學到的事
 
 ### 3.1 「跟 paper 比」必須跟 paper 的 **完整** setup 比
+
+> 🚫 **[作廢 VOID — 2026-09-07]** **本小節整段作廢**，依據 `docs/next/svdd_next_3.md` §4「next_2 §3.1 該作廢」。
+> **錯誤點**：**paper 不是用 ablation_10k**，44.01 也不是 paper 的數字。Paper baseline = `large-v2` + opt + opt-adam = **46.89（公告）／ 48.691（我們重現）**；44.01 是我們自己 fine-tune 贏 paper 6.1% 的結果。
+> **應該說的是**（next_3 §4 給的正確版本）：「我們在 ablation_10k 上比 SVDD 跟 opt，**沒有對應到 paper baseline**。要 vs paper 必須在 large-v2 上跑。」
+> 下方原文保留僅供歷史紀錄，**不可再作為任何 plan 的依據**。
 
 Paper 用 ablation_10k + **opt guidance** + opt-adam legalization → 44.01。我們把 opt 拔掉之後跟 SVDD 比，等於是 strawman。要證明 SVDD 對 paper 有用 → **必須測 SVDD + opt layered**。
 
