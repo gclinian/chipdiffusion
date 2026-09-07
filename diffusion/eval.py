@@ -113,7 +113,7 @@ def main(cfg):
         val_shuffle = False, # Don't shuffle validation set
         )
     with open_dict(cfg):
-        if cfg.family in ["cond_diffusion", "continuous_diffusion", "guided_diffusion", "skip_diffusion", "skip_guided_diffusion", "no_model"]:
+        if cfg.family in ["cond_diffusion", "continuous_diffusion", "guided_diffusion", "skip_diffusion", "skip_guided_diffusion", "no_model", "flow_matching"]:
             cfg.model.update({
                 "num_classes": cfg.num_classes,
                 "input_shape": tuple(sample_shape),
@@ -125,7 +125,8 @@ def main(cfg):
     # Preparing model
     model_types = {
         "cond_diffusion": models.CondDiffusionModel,
-        "continuous_diffusion": models.ContinuousDiffusionModel, 
+        "continuous_diffusion": models.ContinuousDiffusionModel,
+        "flow_matching": models.FlowMatchingModel,
         "guided_diffusion": models.GuidedDiffusionModel,
         "skip_diffusion": models.SkipDiffusionModel,
         "skip_guided_diffusion": models.SkipGuidedDiffusionModel,

@@ -15,3 +15,5 @@ benchmarks/
 *.tar.xz
 hmetis-1.5-linux/
 condaenv.*.requirements.txt
+# Claude Code local (machine-specific) settings — do not share
+.claude/settings.local.json

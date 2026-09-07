@@ -1,0 +1,14 @@
+model:
+  guidance_mode: svdd
+  # No gradient-based guidance — SVDD replaces the inner-loop opt step
+  legality_guidance_weight: 0.0
+  hpwl_guidance_weight: 0.0
+  guidance_step: 0
+  forward_guidance_weight: 0.0
+  grad_descent_steps: 0
+  # SVDD-PM (Soft Value-Based Decoding, Posterior-Mean) hyperparameters
+  svdd_num_candidates: 4          # K candidates per SVDD step
+  svdd_alpha_temp: 1.0            # softmax temperature
+  svdd_lambda_legality: 0.0       # weight on legality in reward (HPWL only by default)
+  svdd_every_n_steps: 5           # do SVDD every N reverse steps
+  svdd_start_step_frac: 0.5       # only do SVDD when t <= this fraction (later denoising)

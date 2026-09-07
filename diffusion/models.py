@@ -1353,6 +1353,28 @@ class ContinuousDiffusionModel(nn.Module):
         self.legality_softmax_factor_max = legality_softmax_factor_max
         self.legality_softmax_critical_factor = legality_softmax_critical_factor
 
+        # SVDD-PM parameters (inference-time value-based decoding)
+        self.svdd_num_candidates = kwargs.get("svdd_num_candidates", 4)
+        self.svdd_alpha_temp = kwargs.get("svdd_alpha_temp", 1.0)
+        self.svdd_lambda_legality = kwargs.get("svdd_lambda_legality", 0.0)
+        self.svdd_every_n_steps = kwargs.get("svdd_every_n_steps", 5)
+        self.svdd_start_step_frac = kwargs.get("svdd_start_step_frac", 0.5)
+        # If True, also apply opt's gradient-based guidance to predicted_x0 each reverse step
+        self.svdd_layer_opt = kwargs.get("svdd_layer_opt", False)
+
+        # CoDe (blockwise best-of-N) parameters
+        self.code_num_candidates = kwargs.get("code_num_candidates", 4)
+        self.code_block_size = kwargs.get("code_block_size", 100)
+        self.code_lambda_legality = kwargs.get("code_lambda_legality", 1.0)
+        self.code_layer_opt = kwargs.get("code_layer_opt", False)
+
+        # TDS (Twisted Diffusion Sampler / SMC) parameters
+        self.tds_num_particles = kwargs.get("tds_num_particles", 4)
+        self.tds_alpha_temp = kwargs.get("tds_alpha_temp", 1.0)
+        self.tds_lambda_legality = kwargs.get("tds_lambda_legality", 1.0)
+        self.tds_ess_threshold_frac = kwargs.get("tds_ess_threshold_frac", 0.5)
+        self.tds_layer_opt = kwargs.get("tds_layer_opt", False)
+
     def __call__(self, x, cond, t):
         # input: x is (B, V, F) for graphs, t is (B), cond is Data obj
         # note: 1 graph at a time
@@ -1360,7 +1382,7 @@ class ContinuousDiffusionModel(nn.Module):
         t_embed = self.t_encoder(t)
         return self._reverse_model(x, cond, t_embed).view(*x.shape)
     
-    def loss(self, x, cond, _, hpwl_weight=0.0, legality_weight=0.0): # last input is for time index; ignored here
+    def loss(self, x, cond, _, hpwl_weight=0.0, legality_weight=0.0, use_timestep_weighting=False): # last input is for time index; ignored here
         B = x.shape[0] # x is (B, V, F) for graphs
         t = self._t_dist.sample((B,)).squeeze(dim = -1)
         assert t.shape == (B,), "t has to have shape (B,)"
@@ -1390,13 +1412,21 @@ class ContinuousDiffusionModel(nn.Module):
             predicted_x0 = torch.where(mask, x, predicted_x0) if mask is not None else predicted_x0
             predicted_x0 = torch.clamp(predicted_x0, -2, 2)
 
+            # Timestep weighting: down-weight early (noisy) timesteps
+            if use_timestep_weighting:
+                ts_weight = self._noise_scheduler.alpha(t) ** 2  # (B,), in [0, 1]
+            else:
+                ts_weight = torch.ones_like(t)  # (B,)
+
             total_loss = denoising_loss
             if hpwl_weight > 0:
-                hpwl_loss = guidance.hpwl_guidance_potential(predicted_x0, cond).mean()
+                hpwl_per_sample = guidance.hpwl_guidance_potential(predicted_x0, cond)  # (B,)
+                hpwl_loss = (ts_weight * hpwl_per_sample).mean()
                 total_loss = total_loss + hpwl_weight * hpwl_loss
                 metrics["hpwl_loss"] = hpwl_loss.detach().cpu().item()
             if legality_weight > 0:
-                legality_loss = guidance.legality_guidance_potential(predicted_x0, cond, mask=mask).mean()
+                legality_per_sample = guidance.legality_guidance_potential(predicted_x0, cond, mask=mask)  # (B,)
+                legality_loss = (ts_weight * legality_per_sample).mean()
                 total_loss = total_loss + legality_weight * legality_loss
                 metrics["legality_loss"] = legality_loss.detach().cpu().item()
             return total_loss, metrics
@@ -1422,6 +1452,13 @@ class ContinuousDiffusionModel(nn.Module):
     def reverse_samples(self, B, x_in, cond, num_timesteps=-1, intermediate_every = 0, mask_override = None, output_log_prob = False):
         # B: batch size
         # intermediate_every: determines how often intermediate diffusion steps are saved and returned. 0 = no intermediates returned
+        if self.guidance_mode == "svdd" and not output_log_prob:
+            return self._reverse_samples_svdd(B, x_in, cond, num_timesteps, intermediate_every, mask_override)
+        if self.guidance_mode == "code" and not output_log_prob:
+            return self._reverse_samples_code(B, x_in, cond, num_timesteps, intermediate_every, mask_override)
+        if self.guidance_mode == "tds" and not output_log_prob:
+            return self._reverse_samples_tds(B, x_in, cond, num_timesteps, intermediate_every, mask_override)
+
         batch_shape = (B, cond.x.shape[0], self.input_shape[1])
         mask_shape = (1, x_in.shape[1], 1)
 
@@ -1499,6 +1536,343 @@ class ContinuousDiffusionModel(nn.Module):
             return x, intermediates, log_probs, predicted_x0_list
         else:
             return x, intermediates
+
+    @torch.no_grad()
+    def _reverse_samples_svdd(self, B, x_in, cond, num_timesteps=-1, intermediate_every=0, mask_override=None):
+        """SVDD-PM (Soft Value-Based Decoding, Posterior-Mean variant).
+        Per reverse step (subject to start_step_frac and every_n_steps): draw K candidates,
+        score each by reward on its t-1 posterior mean, softmax-resample one."""
+        K = int(self.svdd_num_candidates)
+        alpha_temp = float(self.svdd_alpha_temp)
+        lambda_legality = float(self.svdd_lambda_legality)
+        every_n = max(1, int(self.svdd_every_n_steps))
+        start_step_frac = float(self.svdd_start_step_frac)
+        layer_opt = bool(getattr(self, "svdd_layer_opt", False)) and (self.grad_descent_steps > 0)
+
+        batch_shape = (B, cond.x.shape[0], self.input_shape[1])
+        mask_shape = (1, x_in.shape[1], 1)
+        if num_timesteps <= 0:
+            num_timesteps = self.max_diffusion_steps
+
+        x = self._epsilon_dist.sample(batch_shape).squeeze(dim=-1)
+        mask = mask_override.view(*mask_shape) if mask_override is not None else self.get_mask(x_in, cond)
+        x = torch.where(mask, x_in, x) if mask is not None else x
+
+        intermediates = [x]
+        self._noise_scheduler.set_timesteps(num_timesteps)
+        timesteps = self._noise_scheduler.timesteps
+
+        pin_map, pin_offsets, pin_edge_index = guidance.compute_pin_map(cond)
+        hpwl_net = guidance.HPWL()
+
+        # If layering opt guidance, initialize opt's stateful alpha/optimizer
+        if layer_opt:
+            self.reset_guidance_state(dtype=x.dtype)
+
+        for i, (t, t_minus_one) in enumerate(zip(timesteps[:-1], timesteps[1:])):
+            t_vec = torch.tensor(t, device=x.device).expand(B)
+            eps_predict = self(x, cond, t_vec)
+
+            alpha_t = self._noise_scheduler.alpha(t)
+            alpha_t_minus_one = self._noise_scheduler.alpha(t_minus_one)
+            sigma_t = self._noise_scheduler.sigma(t)
+            sigma_t_minus_one = self._noise_scheduler.sigma(t_minus_one)
+            eta = self._noise_scheduler.eta(t, t_minus_one)
+
+            predicted_x0 = (x - sigma_t * eps_predict) / alpha_t
+            if mask is not None:
+                predicted_x0 = torch.where(mask, x, predicted_x0)
+
+            # Layered opt guidance: adjust predicted_x0 via paper's gradient-based force
+            if layer_opt:
+                g = self.reverse_guidance_opt_force(predicted_x0, cond, t, mask)
+                predicted_x0 = predicted_x0 + g
+                if mask is not None:
+                    predicted_x0 = torch.where(mask, x, predicted_x0)
+
+            direction = torch.sqrt(torch.clip(torch.square(sigma_t_minus_one) - torch.square(eta), min=0)) * eps_predict
+            mu = alpha_t_minus_one * predicted_x0 + direction
+
+            is_last_step = (i == len(timesteps) - 2)
+            do_svdd = (not is_last_step) and (float(t) <= start_step_frac) and (i % every_n == 0)
+
+            if do_svdd:
+                # Draw K candidates: K different z's, same mu
+                z_cand = self._epsilon_dist.sample((K, *batch_shape)).squeeze(dim=-1)  # (K,B,V,D)
+                z_cand = z_cand.reshape(K * B, *batch_shape[1:])
+                mu_exp = mu.unsqueeze(0).expand(K, *mu.shape).reshape(K * B, *mu.shape[1:])
+                x_cand = mu_exp + eta * z_cand  # (K*B, V, D)
+                if mask is not None:
+                    x_in_exp = x_in.unsqueeze(0).expand(K, *x_in.shape).reshape(K * B, *x_in.shape[1:])
+                    x_cand = torch.where(mask, x_in_exp, x_cand)
+                x_cand = torch.clamp(x_cand, -2, 2)
+
+                # Posterior-mean rollout at t-1: one eps_theta forward, Tweedie
+                t_minus_one_vec = torch.tensor(t_minus_one, device=x.device).expand(K * B)
+                eps_k = self(x_cand, cond, t_minus_one_vec)
+                pred_x0_k = (x_cand - sigma_t_minus_one * eps_k) / alpha_t_minus_one
+                if mask is not None:
+                    pred_x0_k = torch.where(mask, x_cand, pred_x0_k)
+                pred_x0_k = torch.clamp(pred_x0_k, -2, 2)
+
+                # Reward = -(HPWL + lambda * legality) on posterior-mean
+                hpwl_val = hpwl_net(pred_x0_k, pin_map, pin_offsets, pin_edge_index)  # (K*B,)
+                if lambda_legality > 0:
+                    leg_val = guidance.legality_guidance_potential(pred_x0_k, cond, mask=mask)  # (K*B,)
+                    reward = -(hpwl_val + lambda_legality * leg_val)
+                else:
+                    reward = -hpwl_val
+                reward = reward.view(K, B)
+
+                # Numerical stability: nan/inf -> very negative; per-batch max-subtraction
+                reward = torch.where(torch.isfinite(reward), reward, torch.full_like(reward, -1e9))
+                reward = reward - reward.max(dim=0, keepdim=True).values.detach()
+                weights = torch.softmax(reward / max(alpha_temp, 1e-6), dim=0)  # (K, B)
+                weights = torch.nan_to_num(weights, nan=1.0 / K, posinf=1.0, neginf=0.0)
+                weights = weights / (weights.sum(dim=0, keepdim=True) + 1e-12)
+                idx = torch.multinomial(weights.transpose(0, 1), num_samples=1).squeeze(-1)  # (B,)
+                x_kb = x_cand.view(K, B, *x_cand.shape[1:])
+                batch_idx = torch.arange(B, device=x.device)
+                x = x_kb[idx, batch_idx]
+            else:
+                z = self._epsilon_dist.sample(batch_shape).squeeze(dim=-1) if not is_last_step else torch.zeros_like(x)
+                x = mu + eta * z
+                if mask is not None:
+                    x = torch.where(mask, x_in, x)
+                x = torch.clamp(x, -2, 2)
+
+            if intermediate_every and (i + 1) % intermediate_every == 0:
+                intermediates.append(x)
+
+        return x, intermediates
+
+    @torch.no_grad()
+    def _reverse_samples_code(self, B, x_in, cond, num_timesteps=-1, intermediate_every=0, mask_override=None):
+        """CoDe (Blockwise Best-of-N) sampler. arXiv:2502.00968.
+        Every `code_block_size` reverse steps: fork K candidates from current mu,
+        evaluate reward on each candidate's t-1 posterior mean, hard-argmax-select one.
+        Cheaper than SVDD (K-particle eval only at block boundaries, not every step).
+        """
+        K = int(self.code_num_candidates)
+        block_size = max(1, int(self.code_block_size))
+        lambda_legality = float(self.code_lambda_legality)
+        layer_opt = bool(getattr(self, "code_layer_opt", False)) and (self.grad_descent_steps > 0)
+
+        batch_shape = (B, cond.x.shape[0], self.input_shape[1])
+        mask_shape = (1, x_in.shape[1], 1)
+        if num_timesteps <= 0:
+            num_timesteps = self.max_diffusion_steps
+
+        x = self._epsilon_dist.sample(batch_shape).squeeze(dim=-1)
+        mask = mask_override.view(*mask_shape) if mask_override is not None else self.get_mask(x_in, cond)
+        x = torch.where(mask, x_in, x) if mask is not None else x
+
+        intermediates = [x]
+        self._noise_scheduler.set_timesteps(num_timesteps)
+        timesteps = self._noise_scheduler.timesteps
+
+        pin_map, pin_offsets, pin_edge_index = guidance.compute_pin_map(cond)
+        hpwl_net = guidance.HPWL()
+
+        if layer_opt:
+            self.reset_guidance_state(dtype=x.dtype)
+
+        for i, (t, t_minus_one) in enumerate(zip(timesteps[:-1], timesteps[1:])):
+            t_vec = torch.tensor(t, device=x.device).expand(B)
+            eps_predict = self(x, cond, t_vec)
+
+            alpha_t = self._noise_scheduler.alpha(t)
+            alpha_t_minus_one = self._noise_scheduler.alpha(t_minus_one)
+            sigma_t = self._noise_scheduler.sigma(t)
+            sigma_t_minus_one = self._noise_scheduler.sigma(t_minus_one)
+            eta = self._noise_scheduler.eta(t, t_minus_one)
+
+            predicted_x0 = (x - sigma_t * eps_predict) / alpha_t
+            if mask is not None:
+                predicted_x0 = torch.where(mask, x, predicted_x0)
+
+            if layer_opt:
+                g = self.reverse_guidance_opt_force(predicted_x0, cond, t, mask)
+                predicted_x0 = predicted_x0 + g
+                if mask is not None:
+                    predicted_x0 = torch.where(mask, x, predicted_x0)
+
+            direction = torch.sqrt(torch.clip(torch.square(sigma_t_minus_one) - torch.square(eta), min=0)) * eps_predict
+            mu = alpha_t_minus_one * predicted_x0 + direction
+
+            is_last_step = (i == len(timesteps) - 2)
+            # CoDe: only do best-of-N at block boundaries (every block_size steps, but not step 0)
+            do_code = (not is_last_step) and (i > 0) and (i % block_size == 0)
+
+            if do_code:
+                z_cand = self._epsilon_dist.sample((K, *batch_shape)).squeeze(dim=-1)
+                z_cand = z_cand.reshape(K * B, *batch_shape[1:])
+                mu_exp = mu.unsqueeze(0).expand(K, *mu.shape).reshape(K * B, *mu.shape[1:])
+                x_cand = mu_exp + eta * z_cand
+                if mask is not None:
+                    x_in_exp = x_in.unsqueeze(0).expand(K, *x_in.shape).reshape(K * B, *x_in.shape[1:])
+                    x_cand = torch.where(mask, x_in_exp, x_cand)
+                x_cand = torch.clamp(x_cand, -2, 2)
+
+                t_minus_one_vec = torch.tensor(t_minus_one, device=x.device).expand(K * B)
+                eps_k = self(x_cand, cond, t_minus_one_vec)
+                pred_x0_k = (x_cand - sigma_t_minus_one * eps_k) / alpha_t_minus_one
+                if mask is not None:
+                    pred_x0_k = torch.where(mask, x_cand, pred_x0_k)
+                pred_x0_k = torch.clamp(pred_x0_k, -2, 2)
+
+                hpwl_val = hpwl_net(pred_x0_k, pin_map, pin_offsets, pin_edge_index)
+                if lambda_legality > 0:
+                    leg_val = guidance.legality_guidance_potential(pred_x0_k, cond, mask=mask)
+                    reward = -(hpwl_val + lambda_legality * leg_val)
+                else:
+                    reward = -hpwl_val
+                reward = reward.view(K, B)
+
+                # Hard argmax over K (CoDe's defining feature vs SVDD's softmax)
+                reward = torch.where(torch.isfinite(reward), reward, torch.full_like(reward, -1e9))
+                idx = reward.argmax(dim=0)  # (B,)
+                x_kb = x_cand.view(K, B, *x_cand.shape[1:])
+                batch_idx = torch.arange(B, device=x.device)
+                x = x_kb[idx, batch_idx]
+            else:
+                z = self._epsilon_dist.sample(batch_shape).squeeze(dim=-1) if not is_last_step else torch.zeros_like(x)
+                x = mu + eta * z
+                if mask is not None:
+                    x = torch.where(mask, x_in, x)
+                x = torch.clamp(x, -2, 2)
+
+            if intermediate_every and (i + 1) % intermediate_every == 0:
+                intermediates.append(x)
+
+        return x, intermediates
+
+    @torch.no_grad()
+    def _reverse_samples_tds(self, B, x_in, cond, num_timesteps=-1, intermediate_every=0, mask_override=None):
+        """TDS (Twisted Diffusion Sampler / SMC). arXiv:2306.17775.
+        Maintain N particles running reverse process in parallel.
+        Per step: standard reverse, then importance weight update via delta of
+        value(predicted_x0) (reward improvement). ESS-based resampling.
+        Output: best-final-reward particle (collapses N -> 1)."""
+        N = int(self.tds_num_particles)
+        alpha_temp = float(self.tds_alpha_temp)
+        lambda_legality = float(self.tds_lambda_legality)
+        ess_threshold_frac = float(self.tds_ess_threshold_frac)
+        layer_opt = bool(getattr(self, "tds_layer_opt", False)) and (self.grad_descent_steps > 0)
+
+        assert B == 1, f"TDS expects B=1 (per-sample particle filter), got B={B}"
+
+        batch_shape = (N, cond.x.shape[0], self.input_shape[1])
+        mask_shape = (1, x_in.shape[1], 1)
+        if num_timesteps <= 0:
+            num_timesteps = self.max_diffusion_steps
+
+        x = self._epsilon_dist.sample(batch_shape).squeeze(dim=-1)  # (N, V, F)
+        mask = mask_override.view(*mask_shape) if mask_override is not None else self.get_mask(x_in, cond)
+        x_in_n = x_in.expand(N, *x_in.shape[1:]) if x_in.shape[0] == 1 else x_in
+        x = torch.where(mask, x_in_n, x) if mask is not None else x
+
+        intermediates = [x[:1]]
+        self._noise_scheduler.set_timesteps(num_timesteps)
+        timesteps = self._noise_scheduler.timesteps
+
+        pin_map, pin_offsets, pin_edge_index = guidance.compute_pin_map(cond)
+        hpwl_net = guidance.HPWL()
+
+        if layer_opt:
+            self.reset_guidance_state(dtype=x.dtype)
+
+        ess_threshold = ess_threshold_frac * N
+        log_w = torch.zeros(N, device=x.device)
+        prev_value = None  # value of predicted_x0 at previous step's x
+
+        def _value(x_eval, t_eval):
+            """Compute reward = -(HPWL + lambda * legality) on Tweedie predicted_x0(x_eval, t_eval). Returns (N,)."""
+            t_v = torch.tensor(t_eval, device=x_eval.device).expand(x_eval.shape[0])
+            eps_e = self(x_eval, cond, t_v)
+            a_t = self._noise_scheduler.alpha(t_eval)
+            s_t = self._noise_scheduler.sigma(t_eval)
+            px0 = (x_eval - s_t * eps_e) / a_t
+            if mask is not None:
+                px0 = torch.where(mask, x_eval, px0)
+            px0 = torch.clamp(px0, -2, 2)
+            h_v = hpwl_net(px0, pin_map, pin_offsets, pin_edge_index)
+            if lambda_legality > 0:
+                l_v = guidance.legality_guidance_potential(px0, cond, mask=mask)
+                return -(h_v + lambda_legality * l_v)
+            return -h_v
+
+        for i, (t, t_minus_one) in enumerate(zip(timesteps[:-1], timesteps[1:])):
+            # Standard reverse: x_t -> x_{t-1}
+            t_vec = torch.tensor(t, device=x.device).expand(N)
+            eps_predict = self(x, cond, t_vec)
+
+            alpha_t = self._noise_scheduler.alpha(t)
+            alpha_t_minus_one = self._noise_scheduler.alpha(t_minus_one)
+            sigma_t = self._noise_scheduler.sigma(t)
+            sigma_t_minus_one = self._noise_scheduler.sigma(t_minus_one)
+            eta = self._noise_scheduler.eta(t, t_minus_one)
+
+            predicted_x0 = (x - sigma_t * eps_predict) / alpha_t
+            if mask is not None:
+                predicted_x0 = torch.where(mask, x, predicted_x0)
+
+            if layer_opt:
+                g = self.reverse_guidance_opt_force(predicted_x0, cond, t, mask)
+                predicted_x0 = predicted_x0 + g
+                if mask is not None:
+                    predicted_x0 = torch.where(mask, x, predicted_x0)
+
+            direction = torch.sqrt(torch.clip(torch.square(sigma_t_minus_one) - torch.square(eta), min=0)) * eps_predict
+            mu = alpha_t_minus_one * predicted_x0 + direction
+
+            is_last_step = (i == len(timesteps) - 2)
+            z = self._epsilon_dist.sample(batch_shape).squeeze(dim=-1) if not is_last_step else torch.zeros_like(x)
+            x = mu + eta * z
+            if mask is not None:
+                x = torch.where(mask, x_in_n, x)
+            x = torch.clamp(x, -2, 2)
+
+            # Importance weight update via value-delta (skip last step where t≈0)
+            if not is_last_step:
+                value_now = _value(x, t_minus_one)  # (N,)
+                value_now = torch.where(torch.isfinite(value_now), value_now, torch.full_like(value_now, -1e9))
+                if prev_value is not None:
+                    delta = value_now - prev_value
+                    delta = torch.where(torch.isfinite(delta), delta, torch.zeros_like(delta))
+                    log_w = log_w + delta / max(alpha_temp, 1e-6)
+                else:
+                    log_w = value_now / max(alpha_temp, 1e-6)
+                prev_value = value_now
+
+                # ESS check
+                log_w_stable = log_w - log_w.max()
+                w_norm = torch.softmax(log_w_stable, dim=0)
+                w_norm = torch.nan_to_num(w_norm, nan=1.0 / N, posinf=1.0, neginf=0.0)
+                w_norm = w_norm / (w_norm.sum() + 1e-12)
+                ess = 1.0 / ((w_norm * w_norm).sum() + 1e-12)
+
+                if ess < ess_threshold:
+                    idx = torch.multinomial(w_norm, num_samples=N, replacement=True)
+                    x = x[idx]
+                    prev_value = prev_value[idx]
+                    log_w = torch.zeros(N, device=x.device)
+
+            if intermediate_every and (i + 1) % intermediate_every == 0:
+                intermediates.append(x[:1])
+
+        # Best-of-N final selection by reward on x (final placement)
+        hpwl_f = hpwl_net(x, pin_map, pin_offsets, pin_edge_index)
+        if lambda_legality > 0:
+            leg_f = guidance.legality_guidance_potential(x, cond, mask=mask)
+            final_reward = -(hpwl_f + lambda_legality * leg_f)
+        else:
+            final_reward = -hpwl_f
+        final_reward = torch.where(torch.isfinite(final_reward), final_reward, torch.full_like(final_reward, -1e9))
+        best_idx = final_reward.argmax()
+        x_out = x[best_idx:best_idx + 1]  # (1, V, F)
+
+        return x_out, intermediates
 
     def get_mask(self, x, cond):
         if self.mask_key and self.mask_key in cond:
@@ -1590,7 +1964,7 @@ class ContinuousDiffusionModel(nn.Module):
             # gradient step wrt alpha
             if t < self.alpha_critical_factor:
                 self.optimizer_alpha.zero_grad()
-                alpha_cost = -self.alpha * (h_legality_raw.detach() - self.legality_potential_target)
+                alpha_cost = -self.alpha * (h_legality_raw.detach() - self.legality_potential_target).mean()
                 alpha_cost.backward()
                 self.optimizer_alpha.step()
                 
@@ -1617,6 +1991,138 @@ class ContinuousDiffusionModel(nn.Module):
         else:
             self.optimizer_alpha = torch.optim.SGD((self.alpha,), lr=self.alpha_lr, momentum=0.0)
         return
+
+class FlowMatchingModel(ContinuousDiffusionModel):
+    """Conditional Flow Matching (linear / OT path) sibling of ContinuousDiffusionModel.
+
+    Reuses the same backbone, mask handling, time encoder and __init__ kwargs so that
+    the existing `model:` config section applies unchanged (only `family=flow_matching`).
+    The network output `self(x_t, cond, t)` is interpreted as a velocity field v_theta.
+
+    Convention: x0 = data placement, x1 ~ N(0, I), x_t = (1-t)*x0 + t*x1, and the sampler
+    integrates the ODE dx/dt = v backwards from t=1 (noise) to t=0 (data).
+    Guidance is intentionally not ported here (Phase A only uses guidance_mode == "none").
+    """
+
+    def loss(self, x, cond, _, hpwl_weight=0.0, legality_weight=0.0, use_timestep_weighting=False):
+        # last input (t index) ignored; we sample continuous t ~ U(0,1) internally
+        B = x.shape[0]  # x is (B, V, F)
+        t = self._t_dist.sample((B,)).squeeze(dim=-1)  # (B,) in [0,1]
+        assert t.shape == (B,), "t has to have shape (B,)"
+
+        # prepare mask (ports are fixed / excluded from loss)
+        mask = None
+        if self.mask_key and self.mask_key in cond:
+            mask = self.get_mask(x, cond)
+
+        # linear/OT interpolation path
+        x1 = self._epsilon_dist.sample(x.shape).squeeze(dim=-1)  # (B, V, F) noise
+        input_dims = len(x.shape[1:])
+        t_b = t.view((B, *([1] * input_dims)))
+        x_t = (1.0 - t_b) * x + t_b * x1
+        x_t = torch.where(mask, x, x_t) if mask is not None else x_t
+
+        v_target = x1 - x  # target velocity v* = x1 - x0
+        v_predict = self(x_t, cond, t)
+
+        pred_masked = v_predict.detach()[torch.logical_not(mask).expand(x.shape)] if mask is not None else v_predict.detach()
+        metrics = {"v_theta_mean": pred_masked.mean().cpu().numpy(), "v_theta_std": pred_masked.std().cpu().numpy()}
+        loss = self._loss(v_predict, v_target, mask)
+
+        # Auxiliary losses on the estimated clean placement x0_hat = x_t - t * v_theta
+        if hpwl_weight > 0 or legality_weight > 0:
+            predicted_x0 = x_t - t_b * v_predict
+            predicted_x0 = torch.where(mask, x, predicted_x0) if mask is not None else predicted_x0
+            predicted_x0 = torch.clamp(predicted_x0, -2, 2)
+            ts_weight = (1.0 - t) if use_timestep_weighting else torch.ones_like(t)
+            total_loss = loss
+            if hpwl_weight > 0:
+                hpwl_per_sample = guidance.hpwl_guidance_potential(predicted_x0, cond)
+                hpwl_loss = (ts_weight * hpwl_per_sample).mean()
+                total_loss = total_loss + hpwl_weight * hpwl_loss
+                metrics["hpwl_loss"] = hpwl_loss.detach().cpu().item()
+            if legality_weight > 0:
+                legality_per_sample = guidance.legality_guidance_potential(predicted_x0, cond, mask=mask)
+                legality_loss = (ts_weight * legality_per_sample).mean()
+                total_loss = total_loss + legality_weight * legality_loss
+                metrics["legality_loss"] = legality_loss.detach().cpu().item()
+            return total_loss, metrics
+
+        return loss, metrics
+
+    def forward_samples(self, x, cond, intermediate_every=0):
+        # linear interpolation path from data (t=0) toward noise (t=1)
+        intermediates = []
+        mask = None
+        if self.mask_key and self.mask_key in cond:
+            mask = self.get_mask(x, cond)
+        step_size = intermediate_every / self.max_diffusion_steps if intermediate_every else 1
+        for t in torch.arange(0, 1 + (1e-9), step_size):
+            t_b = t.to(x.device)
+            x1 = self._epsilon_dist.sample(x.shape).squeeze(dim=-1)
+            x_t = (1.0 - t_b) * x + t_b * x1
+            x_t = torch.where(mask, x, x_t) if mask is not None else x_t
+            intermediates.append(x_t)
+        return intermediates
+
+    def reverse_samples(self, B, x_in, cond, num_timesteps=-1, intermediate_every=0, mask_override=None, output_log_prob=False):
+        # Euler ODE integration from t=1 (noise) to t=0 (data): x <- x - dt * v_theta
+        batch_shape = (B, cond.x.shape[0], self.input_shape[1])
+        mask_shape = (1, x_in.shape[1], 1)
+
+        if num_timesteps <= 0:
+            num_timesteps = self.max_diffusion_steps
+
+        x = self._epsilon_dist.sample(batch_shape).squeeze(dim=-1)  # x at t=1 (pure noise)
+        mask = mask_override.view(*mask_shape) if mask_override is not None else self.get_mask(x_in, cond)
+        x = torch.where(mask, x_in, x) if mask is not None else x
+
+        intermediates = [x]
+        # uniform time grid from 1 -> 0 with num_timesteps Euler steps
+        ts = torch.linspace(1.0, 0.0, num_timesteps + 1, device=x.device)
+
+        # opt guidance on the x0_hat estimate, same mechanism as the DDPM sampler.
+        # On the linear path the guided update is exact: given x0_hat at time t,
+        # x_{t_next} = x0_hat + (t_next/t) * (x_t - x0_hat).
+        use_guidance = self.is_guided_sampling and self.guidance_mode == "opt"
+        if use_guidance:
+            self.reset_guidance_state(dtype=x.dtype)
+
+        if output_log_prob:
+            log_probs = torch.zeros((num_timesteps, B,), device=x.device)
+            predicted_x0_list = []
+
+        for i in range(num_timesteps):
+            t = ts[i]
+            t_next = ts[i + 1]
+            dt = (t - t_next)  # positive step size
+            t_vec = t.expand(B)
+            v = self(x, cond, t_vec)
+
+            # estimated clean placement x0_hat = x - t * v
+            predicted_x0 = x - t * v
+            predicted_x0 = torch.where(mask, x_in, predicted_x0) if mask is not None else predicted_x0
+
+            if output_log_prob:
+                predicted_x0_list.append(predicted_x0.detach())
+
+            if use_guidance:
+                g = self.reverse_guidance_opt_force(predicted_x0, cond, float(t), mask)
+                x0_guided = predicted_x0 + g
+                x0_guided = torch.where(mask, x_in, x0_guided) if mask is not None else x0_guided
+                x = x0_guided + (t_next / t) * (x - x0_guided)
+            else:
+                x = x - dt * v
+            x = torch.where(mask, x_in, x) if mask is not None else x
+            x = torch.clamp(x, -2, 2)
+
+            if intermediate_every and (i + 1) % intermediate_every == 0:
+                intermediates.append(x)
+
+        if output_log_prob:
+            return x, intermediates, log_probs, predicted_x0_list
+        else:
+            return x, intermediates
 
 def pi_log_prob(x_t_minus, mu, sigma):
     # mu should have gradients, x_t_minus should be detached

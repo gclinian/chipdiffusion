@@ -1,0 +1,25 @@
+model:
+  # CoDe (Blockwise Best-of-N) with layered opt guidance. arXiv:2502.00968.
+  guidance_mode: code
+
+  # Opt guidance params (same as svdd_layered.yaml + CLAUDE.md tuned overrides)
+  guidance_step: 1000
+  forward_guidance_weight: 0.0
+  grad_descent_rate: 8e-3
+  grad_descent_steps: 20
+  hpwl_guidance_weight: 16e-4
+  legality_guidance_weight: 0.0
+  alpha_init: 0.0
+  alpha_lr: 5e-4
+  alpha_critical_factor: 0.5
+  legality_potential_target: 1e-4
+  use_adam: True
+  legality_softmax_factor_min: 10.0
+  legality_softmax_factor_max: 20.0
+  legality_softmax_critical_factor: 0.1
+
+  # CoDe params (matched to SVDD layered K=4, λ=1 for direct comparison)
+  code_num_candidates: 4
+  code_block_size: 100
+  code_lambda_legality: 1.0
+  code_layer_opt: True
