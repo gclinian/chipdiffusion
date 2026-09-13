@@ -1,9 +1,9 @@
 # STATUS — 自動產生，不要手改
 
-由 `python3 scripts/ledger.py status` 產生於 **2026-09-07 23:06**。
-來源：`docs/ledger/runs.jsonl`（123 runs）+ `docs/ledger/results/`（逐筆 metrics.csv 存檔）。
+由 `python3 scripts/ledger.py status` 產生於 **2026-09-13 22:33**。
+來源：`docs/ledger/runs.jsonl`（128 runs）+ `docs/ledger/results/`（逐筆 metrics.csv 存檔）。
 
-環境指紋：GPU `NVIDIA GeForce RTX 5090, 32607 MiB` ・ git `300eb49`（**working tree 有未 commit 變更**）
+環境指紋：GPU `NVIDIA GeForce RTX 5090, 32607 MiB` ・ git `3778bb9`（**working tree 有未 commit 變更**）
 
 ## Leaderboard（7-circuit avg HPWL，排除 bigblue2，越低越好）
 
@@ -42,7 +42,7 @@
 ## ⚠ 中斷的 eval（跑到一半，既不是 done 也不是 orphan）
 
 單張競爭 GPU 上被 kill / OOM / tmux 掉線的 run。
-（另有 23 個只跑 adaptec1/bigblue1 的便宜篩選 run，那是刻意的形狀，不列入。）
+（另有 28 個只跑 adaptec1/bigblue1 的便宜篩選 run，那是刻意的形狀，不列入。）
 
 - 無
 

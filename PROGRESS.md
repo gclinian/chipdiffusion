@@ -1,5 +1,20 @@
 # Progress Tracker
 
+## Step 12: 新方法/架構 survey → 實驗 (2026-09-13)
+- [x] 12.0 環境修復：`chipdiff-b` = torch 2.11.0+cu128 / torchvision 0.26 / PyG 2.8 / numpy 1.23.5，
+  sm_120 kernel 可跑，smoke eval 23 s 通過，training path (autocast+GradScaler) 通過。`chipdiff` 未動。
+  用法：`PYTHONPATH=. /ibmnas/427/r115/gclin/miniforge3/envs/chipdiff-b/bin/python diffusion/eval.py ...`
+  **⚠ 漂移訊號**：adaptec1 baseline 新 stack = 9.176 ± 0.018 (n=3) vs 舊紀錄 10.22 (n=1, 原始檔已遺失)。
+  新值貼近 paper 的 9.19；舊值才是離群。**整張 48.691 baseline 表要在新 stack 重量。**
+  另：eval 在固定 seed 下不完全 deterministic（GPU scatter atomics），full settings 下 σ≈0.02 可忽略，
+  但縮減步數的 smoke config 下膨脹到 ~1.8% — 不要用縮減設定做比較。
+- [ ] 12.1 Survey：flow matching 變體、drifting model、backbone 架構、DDPM 訓練改進、
+  近期 placement 生成論文 → `docs/survey/method_survey_1.md` — **In progress**
+- [ ] 12.2 升級後驗證 — **In progress**：先重量 paper baseline 7 circuits seed 300
+  （`base_cu128_s300_part{1,2}`，對照舊 48.691 逐 circuit），再重跑 Run F（對照 44.321）
+- [ ] 12.3 依 survey 排序寫 `docs/plan/<track>_plan_1.md` 並依序執行
+- 模型分工：survey 資料蒐集 / 環境 / 執行 → Opus；分析、排序、計畫、判讀 → Fable
+
 ## Step 10: 回歸回顧 (2026-09-06, 距上次動工 2 個月)
 - [x] 全 repo 交叉回顧（8 條實驗線 + 程式狀態 + 磁碟結果稽核）→ `docs/next/comeback_next_1.md`
 - **阻斷發現**: GPU 已換成 RTX 5090 (sm_120, 32.6 GB)，`chipdiff` env 的 torch 2.2.1+cu121
