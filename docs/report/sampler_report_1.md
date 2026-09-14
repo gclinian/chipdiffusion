@@ -181,7 +181,8 @@ paired Δavg6 = +0.632 ± 2.371（t=0.46，n=3）— 但這個數字不能用：
 在所有 circuit 都是 0.80–0.95（overlap 正是 legalization 要修的東西），所以 0/4 候選過門檻，每一列都落入
 fallback「取 legality 最高者」— **從頭到尾沒有用 HPWL 選過**（7 個 circuit 裡 6 個 chosen ≠ argmin HPWL）。
 這是我的預登記錯誤，不是程式錯誤；程式已補一個 loud warning + 純 HPWL fallback，避免再靜默發生。
-Runs: `bon2a_legall_{a1,bb4}`、`bon2b_s{300,301,302}_*`（後者作廢）。
+為完整記錄（**不可用**）：bon2b avg6 = 30.090 (s300, avg7 44.817) / 33.794 (s301) / 31.650 (s302)。
+Runs: `bon2a_legall_{a1,bb4}`、`bon2b_s300`、`bon2b_s301`、`bon2b_s302`（後三者作廢）。
 
 ### 2c 修正協定（N=4，**全部 legalize**，post-leg HPWL 選，floor 0.97 on post-leg）⏳
 6 便宜 circuit × seeds 300/301/302；bigblue4 用 2a 的 seed 300 cell。對照 0c 三 seed baseline（配對）。

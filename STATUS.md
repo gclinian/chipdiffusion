@@ -3,7 +3,7 @@
 由 `python3 scripts/ledger.py status` 產生於 **2026-09-14 17:49**。
 來源：`docs/ledger/runs.jsonl`（175 runs）+ `docs/ledger/results/`（逐筆 metrics.csv 存檔）。
 
-環境指紋：GPU `NVIDIA GeForce RTX 5090, 32607 MiB` ・ git `e46f261`（**working tree 有未 commit 變更**）
+環境指紋：GPU `NVIDIA GeForce RTX 5090, 32607 MiB` ・ git `91b85ad`（**working tree 有未 commit 變更**）
 
 ## Leaderboard（7-circuit avg HPWL，排除 bigblue2，越低越好）
 
@@ -111,9 +111,7 @@ avg6 = 六個便宜 circuit（bigblue4 佔 eval 時間 78%，3-seed 協定只在
 
 以 avg7 數值比對（2/3 位小數）而非目錄名，因為文件裡引用結果用的是方法名不是路徑。
 
-- `ispd2005-s0.bon2b_s302.302` avg6=31.650　_2026-09-14_
-- `ispd2005-s0.bon2b_s301.301` avg6=33.794　_2026-09-14_
-- `ispd2005-s0.bon2b_s300.300` avg7=44.817　_2026-09-14_
+- 無
 
 ## 判讀規則（同時明文寫在 CLAUDE.md，工具關掉也有效）
 
