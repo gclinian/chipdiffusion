@@ -32,6 +32,11 @@
     best-of-N（e3ff934：`open_loop_multi` max_score bug 修正、`hpwl_pre_legalization` 永遠記錄、
     `+num_candidates=N +candidate_legality_floor=0.97 [+legalize_all_candidates=true]`）。
     兩者由 Opus 在 worktree 實作、CPU 測試、Fable review 後合併。
+  - [x] 程式：`frame_average` D4 test-time symmetrization（branch `frame-average`，53 行，default off
+    bit-identical）。`+model.frame_average=true`，四個 sampler（plain / SVDD / CoDe / TDS）全部走
+    `_eps()` helper。CPU 測試：inverse round-trip 0.0、eps_bar 對 8 個 frame 的 equivariance
+    rel 5.0e-8（未平均者 2.8e-1）、default 路徑與改動前 bit-identical、cost 8.0–8.4×/step。
+    **尚未在 GPU 上量過 HPWL。**
   - [ ] GPU 佇列 `scripts/run_sampler_plan_1.sh`（log: `logs/eval_logs/_queue.log`）：
     1A unguided control (4) → 0c baseline s301/302 (4) → **re-anchor** Run F s301/302 + SVDD s300–302 (10)
     → 1B η×T (12) → 1C t_shift (4) → 2a legalize-all (2) → 2b BoN 協定 (7)。skip-if-done，單一失敗不中斷。

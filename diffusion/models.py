@@ -1384,6 +1384,8 @@ class ContinuousDiffusionModel(nn.Module):
         self.t_shift_ref_size = float(kwargs.get("t_shift_ref_size", 400))  # V of a typical training graph
         self.t_shift_invert = bool(kwargs.get("t_shift_invert", False))  # s = sqrt(ref/V) instead of sqrt(V/ref)
         self._noise_scheduler.t_shift = self.t_shift
+        # frame_average: symmetrize eps over the 8 dihedral frames at sampling time (8x forwards)
+        self.frame_average = bool(kwargs.get("frame_average", False))
 
     def __call__(self, x, cond, t):
         # input: x is (B, V, F) for graphs, t is (B), cond is Data obj
@@ -1470,6 +1472,30 @@ class ContinuousDiffusionModel(nn.Module):
             print(f"t_shift: effective s={s:.4f}")
         self._noise_scheduler.t_shift = s
 
+    def _frames(self, cond):
+        # the 8 dihedral-transformed conds are constant per circuit -> build once per sampler call
+        if not self.frame_average:
+            return None
+        import copy, utils
+        lean = copy.copy(cond) # shallow: shares storage, so dropping a key leaves the caller's cond intact
+        if "original_cond" in lean:
+            del lean["original_cond"] # macros_only stashes the full pre-removal graph here; clone()s it deeply
+        zero = torch.zeros((1, cond.x.shape[0], 2), device=cond.x.device, dtype=cond.edge_attr.dtype)
+        return [utils.dihedral_transform_graph(zero, lean, k)[1] for k in range(8)]
+
+    def _eps(self, x, cond, t, frames=None):
+        # Frame averaging (Puny et al., ICLR 2022): the canvas [-1,1]^2 is D4-symmetric, so
+        # eps_bar = mean_k g_k^-1 eps_theta(g_k x, g_k cond, t) is exactly D4-equivariant.
+        # frames=None (the default knob state) keeps the original single forward, bit for bit.
+        if frames is None:
+            return self(x, cond, t)
+        import utils
+        eps_bar = None
+        for k, cond_k in enumerate(frames):
+            eps_k = utils.dihedral_points(self(utils.dihedral_points(x, k), cond_k, t), k, inverse=True)
+            eps_bar = eps_k if eps_bar is None else eps_bar + eps_k
+        return eps_bar / len(frames)
+
     def reverse_samples(self, B, x_in, cond, num_timesteps=-1, intermediate_every = 0, mask_override = None, output_log_prob = False):
         # B: batch size
         # intermediate_every: determines how often intermediate diffusion steps are saved and returned. 0 = no intermediates returned
@@ -1495,6 +1521,7 @@ class ContinuousDiffusionModel(nn.Module):
         self._set_t_shift(cond)
         self._noise_scheduler.set_timesteps(num_timesteps)
         timesteps = self._noise_scheduler.timesteps
+        frames = self._frames(cond)
 
         if output_log_prob:
             log_probs = torch.zeros((len(timesteps) - 1, B,), device = x.device)
@@ -1516,7 +1543,7 @@ class ContinuousDiffusionModel(nn.Module):
                 guidance_fn = None
 
             t_vec = torch.tensor(t, device=x.device).expand(B)
-            eps_predict = self(x, cond, t_vec)
+            eps_predict = self._eps(x, cond, t_vec, frames)
 
             z = self._epsilon_dist.sample(batch_shape).squeeze(dim = -1) if i<(len(timesteps)-2) else torch.zeros_like(x)
 
@@ -1587,6 +1614,7 @@ class ContinuousDiffusionModel(nn.Module):
 
         pin_map, pin_offsets, pin_edge_index = guidance.compute_pin_map(cond)
         hpwl_net = guidance.HPWL()
+        frames = self._frames(cond)
 
         # If layering opt guidance, initialize opt's stateful alpha/optimizer
         if layer_opt:
@@ -1594,7 +1622,7 @@ class ContinuousDiffusionModel(nn.Module):
 
         for i, (t, t_minus_one) in enumerate(zip(timesteps[:-1], timesteps[1:])):
             t_vec = torch.tensor(t, device=x.device).expand(B)
-            eps_predict = self(x, cond, t_vec)
+            eps_predict = self._eps(x, cond, t_vec, frames)
 
             alpha_t = self._noise_scheduler.alpha(t)
             alpha_t_minus_one = self._noise_scheduler.alpha(t_minus_one)
@@ -1632,7 +1660,7 @@ class ContinuousDiffusionModel(nn.Module):
 
                 # Posterior-mean rollout at t-1: one eps_theta forward, Tweedie
                 t_minus_one_vec = torch.tensor(t_minus_one, device=x.device).expand(K * B)
-                eps_k = self(x_cand, cond, t_minus_one_vec)
+                eps_k = self._eps(x_cand, cond, t_minus_one_vec, frames)
                 pred_x0_k = (x_cand - sigma_t_minus_one * eps_k) / alpha_t_minus_one
                 if mask is not None:
                     pred_x0_k = torch.where(mask, x_cand, pred_x0_k)
@@ -1697,13 +1725,14 @@ class ContinuousDiffusionModel(nn.Module):
 
         pin_map, pin_offsets, pin_edge_index = guidance.compute_pin_map(cond)
         hpwl_net = guidance.HPWL()
+        frames = self._frames(cond)
 
         if layer_opt:
             self.reset_guidance_state(dtype=x.dtype)
 
         for i, (t, t_minus_one) in enumerate(zip(timesteps[:-1], timesteps[1:])):
             t_vec = torch.tensor(t, device=x.device).expand(B)
-            eps_predict = self(x, cond, t_vec)
+            eps_predict = self._eps(x, cond, t_vec, frames)
 
             alpha_t = self._noise_scheduler.alpha(t)
             alpha_t_minus_one = self._noise_scheduler.alpha(t_minus_one)
@@ -1739,7 +1768,7 @@ class ContinuousDiffusionModel(nn.Module):
                 x_cand = torch.clamp(x_cand, -2, 2)
 
                 t_minus_one_vec = torch.tensor(t_minus_one, device=x.device).expand(K * B)
-                eps_k = self(x_cand, cond, t_minus_one_vec)
+                eps_k = self._eps(x_cand, cond, t_minus_one_vec, frames)
                 pred_x0_k = (x_cand - sigma_t_minus_one * eps_k) / alpha_t_minus_one
                 if mask is not None:
                     pred_x0_k = torch.where(mask, x_cand, pred_x0_k)
@@ -1803,6 +1832,7 @@ class ContinuousDiffusionModel(nn.Module):
 
         pin_map, pin_offsets, pin_edge_index = guidance.compute_pin_map(cond)
         hpwl_net = guidance.HPWL()
+        frames = self._frames(cond)
 
         if layer_opt:
             self.reset_guidance_state(dtype=x.dtype)
@@ -1814,7 +1844,7 @@ class ContinuousDiffusionModel(nn.Module):
         def _value(x_eval, t_eval):
             """Compute reward = -(HPWL + lambda * legality) on Tweedie predicted_x0(x_eval, t_eval). Returns (N,)."""
             t_v = torch.tensor(t_eval, device=x_eval.device).expand(x_eval.shape[0])
-            eps_e = self(x_eval, cond, t_v)
+            eps_e = self._eps(x_eval, cond, t_v, frames)
             a_t = self._noise_scheduler.alpha(t_eval)
             s_t = self._noise_scheduler.sigma(t_eval)
             px0 = (x_eval - s_t * eps_e) / a_t
@@ -1830,7 +1860,7 @@ class ContinuousDiffusionModel(nn.Module):
         for i, (t, t_minus_one) in enumerate(zip(timesteps[:-1], timesteps[1:])):
             # Standard reverse: x_t -> x_{t-1}
             t_vec = torch.tensor(t, device=x.device).expand(N)
-            eps_predict = self(x, cond, t_vec)
+            eps_predict = self._eps(x, cond, t_vec, frames)
 
             alpha_t = self._noise_scheduler.alpha(t)
             alpha_t_minus_one = self._noise_scheduler.alpha(t_minus_one)
