@@ -32,9 +32,11 @@
     best-of-N（e3ff934：`open_loop_multi` max_score bug 修正、`hpwl_pre_legalization` 永遠記錄、
     `+num_candidates=N +candidate_legality_floor=0.97 [+legalize_all_candidates=true]`）。
     兩者由 Opus 在 worktree 實作、CPU 測試、Fable review 後合併。
-  - [ ] GPU 佇列（序列，自動接續）：Run F part2 → 1A unguided control (4) → 0c baseline s301/302 (4)
-    → 1B η×T (12) → 1C t_shift up/inv (4) → 2a legalize-all rank-corr (2) → 2b BoN 協定 (7)。
-    所有 run 自動進 ledger；每個 cell 獨立，單一失敗不中斷佇列。
+  - [ ] GPU 佇列 `scripts/run_sampler_plan_1.sh`（log: `logs/eval_logs/_queue.log`）：
+    1A unguided control (4) → 0c baseline s301/302 (4) → **re-anchor** Run F s301/302 + SVDD s300–302 (10)
+    → 1B η×T (12) → 1C t_shift (4) → 2a legalize-all (2) → 2b BoN 協定 (7)。skip-if-done，單一失敗不中斷。
+    教訓：三個 ad-hoc waiter 用 `pgrep -f <pattern>` 等前一批，pattern 出現在自己的 cmdline 裡 →
+    一個死鎖、兩個提早觸發並同時搶 GPU。**佇列一律寫成檔案、用 PID 等待。**
 - 模型分工：survey 資料蒐集 / 環境 / 執行 → Opus；分析、排序、計畫、判讀 → Fable
 
 ## Step 10: 回歸回顧 (2026-09-06, 距上次動工 2 個月)
