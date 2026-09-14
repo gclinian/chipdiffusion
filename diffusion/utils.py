@@ -692,6 +692,24 @@ def postprocess_placement(x, cond, chip_size=None, process_graph=False):
         cond.x = (cond.x * scale)/2
         return x, cond
 
+def dihedral_points(p, k, inverse=False):
+    """Apply the 2-D part of dihedral symmetry k (or its inverse) to vectors p (..., 2).
+    Forward: optional mirror across the y-axis (k>=4), then (k%4) x 90-degree CCW rotations.
+    Inverse: undo in the opposite order -- (k%4) CW rotations, then the mirror (an involution).
+    """
+    px, py = p[..., 0], p[..., 1]
+    if inverse:
+        for _ in range(k % 4):
+            px, py = py, -px
+        if k >= 4:
+            px = -px
+    else:
+        if k >= 4:
+            px = -px
+        for _ in range(k % 4):
+            px, py = -py, px
+    return torch.stack((px, py), dim=-1)
+
 def dihedral_transform_graph(x, cond, k):
     """Apply one of the 8 dihedral (D4) symmetries of the square canvas.
     HPWL- and legality-invariant: canvas is [-1,1]^2 centered at origin.
@@ -702,14 +720,7 @@ def dihedral_transform_graph(x, cond, k):
     Returns transformed (x, cond); cond is cloned, input untouched (dataset objects are cached).
     """
     cond = cond.clone()
-
-    def t2(p):
-        px, py = p[..., 0], p[..., 1]
-        if k >= 4:
-            px = -px
-        for _ in range(k % 4):
-            px, py = -py, px
-        return torch.stack((px, py), dim=-1)
+    t2 = lambda p: dihedral_points(p, k)
 
     x_out = t2(x)
     cond.edge_attr = torch.cat((t2(cond.edge_attr[:, 0:2]), t2(cond.edge_attr[:, 2:4])), dim=-1)
