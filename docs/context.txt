@@ -4,6 +4,9 @@ last updated: 2026-09-07   (前一版 2026-05-18，早於 SVDD 開跑一天，�
 [UPDATE 2026-09-14] 本檔中所有以 48.691 為 anchor 的比較已失效：該 baseline 是壞掉的 run。
 新 stack（chipdiff-b, RTX 5090）重量 paper checkpoint = 45.987 (seed 300)，Run F = 45.700。
 舊 stack 與新 stack 數字不可混比（CLAUDE.md 判讀規則 7）。現行 anchor 看 STATUS.md；
+[UPDATE 2026-09-14 下午] 新 stack 三 seed 配對檢定：微調 (ablation_10k) Δ=+0.002、SVDD_layered
+Δ=−0.175 — **本檔 §3 所稱「SVDD 44.845 ± 0.654 是最強的對外主張」已不成立**；兩個標題主張都是
+壞 baseline 的假象。見 docs/report/sampler_report_1.md re-anchor 節。
 進度看 docs/report/sampler_report_1.md。
 
 ================================================================================

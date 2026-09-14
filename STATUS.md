@@ -1,9 +1,9 @@
 # STATUS — 自動產生，不要手改
 
-由 `python3 scripts/ledger.py status` 產生於 **2026-09-14 11:32**。
-來源：`docs/ledger/runs.jsonl`（142 runs）+ `docs/ledger/results/`（逐筆 metrics.csv 存檔）。
+由 `python3 scripts/ledger.py status` 產生於 **2026-09-14 12:37**。
+來源：`docs/ledger/runs.jsonl`（152 runs）+ `docs/ledger/results/`（逐筆 metrics.csv 存檔）。
 
-環境指紋：GPU `NVIDIA GeForce RTX 5090, 32607 MiB` ・ git `3f9e725`（**working tree 有未 commit 變更**）
+環境指紋：GPU `NVIDIA GeForce RTX 5090, 32607 MiB` ・ git `9f59101`（**working tree 有未 commit 變更**）
 
 ## Leaderboard（7-circuit avg HPWL，排除 bigblue2，越低越好）
 
@@ -18,9 +18,14 @@ avg6 = 六個便宜 circuit（bigblue4 佔 eval 時間 78%，3-seed 協定只在
 | avg7 | avg6 | circuits | run group | seed | checkpoint |
 |-----:|-----:|---------:|-----------|------|------------|
 | — | 30.443 | 6 | `ispd2005-s0.base_cu128_s302.302` | 302 | `large-v2 (paper)` |
+| — | 30.473 | 6 | `ispd2005-s0.svdd_cu128_s302.302` | 302 | `large-v2 (paper)` |
+| 44.166 | 30.521 | 7 | `ispd2005-s0.svdd_cu128_s300.300` | 300 | `large-v2 (paper)` |
 | — | 31.130 | 6 | `ispd2005-s0.base_cu128_s301.301` | 301 | `large-v2 (paper)` |
+| — | 31.131 | 6 | `ispd2005-s0.runF_cu128_s302.302` | 302 | `v1.61-ddpo.ablation_supervised_10k.61/latest.ckpt` |
 | 45.700 | 31.184 | 7 | `ispd2005-s0.runF_cu128_s300.300` | 300 | `v1.61-ddpo.ablation_supervised_10k.61/latest.ckpt` |
+| — | 31.327 | 6 | `ispd2005-s0.runF_cu128_s301.301` | 301 | `v1.61-ddpo.ablation_supervised_10k.61/latest.ckpt` |
 | 45.987 | 32.064 | 7 | `ispd2005-s0.base_cu128_s300.300` | 300 | `large-v2 (paper)` |
+| — | 32.117 | 6 | `ispd2005-s0.svdd_cu128_s301.301` | 301 | `large-v2 (paper)` |
 
 ### 舊 stack（2026-09-13 之前，torch 2.2.1 / 24 GB 卡）— 只能彼此比較，**不可與上表比較**
 
@@ -59,6 +64,10 @@ avg6 = 六個便宜 circuit（bigblue4 佔 eval 時間 78%，3-seed 協定只在
 
 - `ispd2005-s0.base_cu128_s301.301` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-14_
 - `ispd2005-s0.base_cu128_s302.302` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-14_
+- `ispd2005-s0.runF_cu128_s301.301` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-14_
+- `ispd2005-s0.runF_cu128_s302.302` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-14_
+- `ispd2005-s0.svdd_cu128_s301.301` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-14_
+- `ispd2005-s0.svdd_cu128_s302.302` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-14_
 - `ispd2005-s0.diag1A_ddpm_none.300` — 1/7 (bigblue4)　_2026-09-14_
 - `ispd2005-s0.diag1A_fm_none.300` — 1/7 (bigblue4)　_2026-09-14_
 

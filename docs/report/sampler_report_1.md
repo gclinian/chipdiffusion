@@ -11,7 +11,8 @@
   同 seed 同 stack，微調 vs paper ckpt = **Δ−0.29（雜訊帶內，n=1）**。
 - ✅ 1A：unguided FM / DDPM 在 bigblue4 = **2.45 ≥ 1.5** → FM 失敗在 objective/sampler，**維持關閉**。
 - ✅ 0c：baseline 3 seeds avg6 = **31.212 ± 0.813** → 同 stack 2σ bar = 1.63（預登記 1.3 維持，另報 paired t）。
-- ⏳ re-anchor（Run F ×3、SVDD ×3）、1B、1C、2a、2b、3E/3F/3H。
+- ✅ re-anchor：**微調 Δ=+0.002、SVDD Δ=−0.175（paired, n=3）— 兩個標題主張都是壞 baseline 的假象。**
+- ⏳ 1B、1C、**2a/2b（現在最關鍵）**、3E/3F/3H。
 
 ---
 
@@ -66,7 +67,30 @@ per-circuit 雜訊：adaptec4 5.6%、bigblue3 5.5%（單 seed 的 ±8% 逐 circu
 adaptec1 / bigblue1 < 1.5%（這兩個 circuit 的小差距反而可信）。
 bigblue4 維持 seed 300（佔 eval 時間 78%）。Runs: `base_cu128_s{300,301,302}_*`。
 
-### re-anchor：Run F s301/302、SVDD_layered s300/301/302 ⏳
+### re-anchor：Run F ×3、SVDD_layered ×3 ✅ — **兩個標題主張都不成立**
+| seed | Run F avg6 | SVDD avg6 | baseline avg6 | Δ FT | Δ SVDD |
+|---|---:|---:|---:|---:|---:|
+| 300 | 31.184 | 30.521 | 32.064 | −0.88 | −1.54 |
+| 301 | 31.327 | 32.117 | 31.130 | +0.20 | +0.99 |
+| 302 | 31.131 | 30.473 | 30.443 | +0.69 | +0.03 |
+| **mean ± sd** | 31.214 ± 0.10 | 31.037 ± 0.94 | 31.212 ± 0.81 | **+0.002 ± 0.80 (t=0.00)** | **−0.175 ± 1.28 (t=−0.24)** |
+
+avg7（seed 300 only）：Run F 45.700、SVDD 44.166、baseline 45.987；bigblue4：132.80 / 126.03 / 129.53。
+
+**預登記判定**（|Δ| vs 1.3，並報 paired t）：
+- **微調（supervised 10k on v1.61）：Δ = +0.002，在雜訊帶內。** 專案 4–9 月「微調贏 6–9%」的主張
+  完全來自壞掉的 48.691 baseline。三個 seed 的 avg6 幾乎相同（sd 0.10）— 微調讓輸出更穩定，但沒有更好。
+- **SVDD_layered 搜尋：Δ = −0.175，在雜訊帶內。** 「−4.36% vs paper」來自兩個效應疊加：(i) 對壞 baseline
+  比較；(ii) paper 自己的 checkpoint 在我們 stack 上就是 45.99，比它自己發表的 46.89 好 2% — 所以任何
+  在這裡跑的東西都「贏 paper」2%。seed 300 的 −1.54 在 301/302 反向。
+- **Power**：paired sd 0.8–1.3、n=3 → 能排除的效應約 ≥1.5 單位；不能排除 0.5 單位的小效應。
+  但先前宣稱的效應是 2–4 單位，已被排除。
+- CoDe / TDS 與 SVDD 統計上等價（舊 stack），推定同樣為 null；不另花 GPU 重跑。
+
+**後果**：專案至今唯一站得住的正向結果是 (a) paper checkpoint 復現 45.99（贏已發表值 2%，seed/硬體
+差異），(b) 三個獨立實驗證明的「auxiliary HPWL/legality loss 冗餘」負向結果，(c) FM 在 size-OOD 下崩潰
+（1A）。**Best-of-N（Phase 2）是剩下唯一有 within-protocol 量測增益的槓桿**（舊 stack best-of-3 −1.7）。
+Runs: `runF_cu128_s{301,302}_*`、`svdd_cu128_s{300,301,302}_*`。
 
 ---
 
