@@ -42,6 +42,12 @@
     `flowmatch_report_1` §3.2 的說法首次有實驗支撐。pre-legalization HPWL：FM 654→1962（3×）。
     附帶發現：DDPM 無 guidance 的 bigblue4 (269.6) ≈ FM 有 guidance (267.8) → OOD 泛化靠的是
     DDPM **+ opt guidance**，raw model 兩者都弱。n=1；evidential 升級待 bb4 seed 301/302（排 Phase 2 後）。
+  - [x] Survey skeptic pass 全部完成（28 候選）→ 只剩 5 個零訓練測試值得跑，無新範式/backbone。
+    關鍵反證：ledger 全資料回歸顯示 **quality 不隨 macro 數退化**（bigblue4 hpwl_ratio 最好），
+    劣勢在 543–1,329 macro 的小 circuit → hierarchical 關閉；AR-hybrid 的 mask 通道是死碼。
+  - [ ] Phase 3（預登記於 plan）：3E deep-K（config，已排在 1A follow-up 後）；3F post-hoc 權重平均
+    （Opus 產 `avg_250k_500k_uniform.ckpt` 中；Run X 同 stack 重量已排）；3H frame averaging
+    （Opus 在 worktree 實作 `+model.frame_average` 中，合併後排 cells）— **In progress**
 - 模型分工：survey 資料蒐集 / 環境 / 執行 → Opus；分析、排序、計畫、判讀 → Fable
 
 ## Step 10: 回歸回顧 (2026-09-06, 距上次動工 2 個月)
