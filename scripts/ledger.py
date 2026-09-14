@@ -30,6 +30,7 @@ STATUS = os.path.join(ROOT, "STATUS.md")
 CIRCUITS = ["adaptec1", "adaptec2", "adaptec3", "adaptec4",
             "bigblue1", "bigblue2", "bigblue3", "bigblue4"]
 CORE7 = [0, 1, 2, 3, 4, 6, 7]          # bigblue2 (idx 5) excluded from the headline
+CORE6 = [0, 1, 2, 3, 4, 6]             # CORE7 minus bigblue4: the cheap 3-seed protocol
 SCREEN = {"0", "4"}                      # adaptec1/bigblue1: the cheap triage pair, a
                                          # deliberate shape, not a truncated 7-circuit run
 PAPER7 = 46.89
@@ -196,6 +197,11 @@ def merge_groups(rows):
         g["complete"] = len(have) == 7
         g["avg7"] = (round(sum(g["per_circuit"][str(i)] for i in have) / 7, 3)
                      if g["complete"] else None)
+        # cheap 3-seed protocol: the six cheap circuits, bigblue4 (78% of eval time) held at one seed
+        have6 = [i for i in CORE6 if str(i) in g["per_circuit"]]
+        g["complete6"] = len(have6) == 6
+        g["avg6"] = (round(sum(g["per_circuit"][str(i)] for i in have6) / 6, 3)
+                     if g["complete6"] else None)
     return groups
 
 
@@ -236,9 +242,14 @@ def current_baseline(groups):
     checkpoint on the current stack (base_cu128_* groups). Never a hard-coded number —
     the previous constant (48.691, a broken March-2026 run) misled the project for five
     months. Returns (mean, n) or (None, 0)."""
-    vals = [g["avg7"] for g in groups.values()
-            if g["complete"] and g["group"].startswith(BASELINE_PREFIX)]
-    return (round(sum(vals) / len(vals), 3), len(vals)) if vals else (None, 0)
+    import statistics
+    def agg(key, flag):
+        vals = [g[key] for g in groups.values() if g[flag] and g["group"].startswith(BASELINE_PREFIX)]
+        if not vals:
+            return None
+        sd = round(statistics.stdev(vals), 3) if len(vals) > 1 else None
+        return (round(sum(vals) / len(vals), 3), len(vals), sd)
+    return {"avg7": agg("avg7", "complete"), "avg6": agg("avg6", "complete6")}
 
 
 # ---------- STATUS.md ----------
@@ -269,19 +280,29 @@ def render_status():
                            []).append(g)
     w("## Leaderboard（7-circuit avg HPWL，排除 bigblue2，越低越好）")
     w("")
-    base, nb = current_baseline(groups)
-    anchor = f"**{base}**（n={nb}，`base_cu128_*`，現行 stack）" if base else "**尚未在現行 stack 量測**"
-    w(f"參考點：paper 已發表 **{PAPER7}** ・ 我們自己跑 paper checkpoint 的 anchor {anchor}")
+    cb = current_baseline(groups)
+    def fmt(t, label):
+        if not t: return f"{label} 未量測"
+        m, n, sd = t
+        return f"{label} **{m}**（n={n}" + (f", sd {sd}" if sd else "") + "）"
+    w(f"參考點：paper 已發表 **{PAPER7}** ・ 我們自己跑 paper checkpoint（`base_cu128_*`，現行 stack）："
+      f"{fmt(cb['avg7'], 'avg7')} ・ {fmt(cb['avg6'], 'avg6 [無 bigblue4]')}")
+    w("")
+    w("avg6 = 六個便宜 circuit（bigblue4 佔 eval 時間 78%，3-seed 協定只在 seed 300 跑它）。"
+      "同 stack 的 2σ 雜訊帶 = 2 × avg6 sd；差距小於它的結果不算差距。")
     w("")
     w("這張表只含**磁碟上還有 metrics.csv 的 run**。有些歷史結果（Ablation_10k 44.01、"
       "DDPO v2 44.65、AddLoss v1 等）的原始檔已被 eval 目錄碰撞覆蓋，只存在於報告中 — "
       "那些要看 `docs/all_experiments_summary.csv`。兩張表不一致是預期的，差異本身就是資訊。")
     w("")
-    w("| avg7 | n | run group | seed | checkpoint |")
-    w("|-----:|--:|-----------|------|------------|")
-    for g in sorted((g for g in groups.values() if g["complete"]), key=lambda x: x["avg7"]):
+    w("| avg7 | avg6 | circuits | run group | seed | checkpoint |")
+    w("|-----:|-----:|---------:|-----------|------|------------|")
+    rows_ = [g for g in groups.values() if g["complete"] or g["complete6"]]
+    for g in sorted(rows_, key=lambda x: (x["avg6"] if x["avg6"] is not None else 99, x["avg7"] or 99)):
         ck = (g["from_checkpoint"] or "-").replace("../public-models/large-v2/large-v2.ckpt", "large-v2 (paper)")
-        w(f"| {g['avg7']:.3f} | {g['n_circuits']} | `{g['group']}` | {g['seed'] or '-'} | `{ck}` |")
+        a7 = f"{g['avg7']:.3f}" if g["avg7"] is not None else "—"
+        a6 = f"{g['avg6']:.3f}" if g["avg6"] is not None else "—"
+        w(f"| {a7} | {a6} | {g['n_circuits']} | `{g['group']}` | {g['seed'] or '-'} | `{ck}` |")
     w("")
 
     # --- work queues: the three states that actually go missing ---
@@ -327,16 +348,18 @@ def render_status():
     def is_cited(g):
         if any(tok in text for tok in (g["group"], *g["run_ids"])):
             return True
-        return any(f"{g['avg7']:.{d}f}" in text for d in (3, 2))
+        vals = [v for v in (g["avg7"], g["avg6"]) if v is not None]
+        return any(f"{v:.{d}f}" in text for v in vals for d in (3, 2))
 
-    uncited = [g for g in groups.values() if g["complete"] and not is_cited(g)]
+    uncited = [g for g in groups.values() if (g["complete"] or g["complete6"]) and not is_cited(g)]
     w("## ⚠ 未記錄：有完整結果，但這個數字在 docs/ 裡找不到")
     w("")
     w("以 avg7 數值比對（2/3 位小數）而非目錄名，因為文件裡引用結果用的是方法名不是路徑。")
     w("")
     if uncited:
         for g in sorted(uncited, key=lambda x: x["avg7"]):
-            w(f"- `{g['group']}` avg7={g['avg7']:.3f}　_{g['mtime'][:10]}_")
+            v = g['avg7'] if g['avg7'] is not None else g['avg6']
+            w(f"- `{g['group']}` {'avg7' if g['avg7'] is not None else 'avg6'}={v:.3f}　_{g['mtime'][:10]}_")
     else:
         w("- 無")
     w("")

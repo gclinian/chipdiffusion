@@ -3,43 +3,47 @@
 由 `python3 scripts/ledger.py status` 產生於 **2026-09-14 11:31**。
 來源：`docs/ledger/runs.jsonl`（142 runs）+ `docs/ledger/results/`（逐筆 metrics.csv 存檔）。
 
-環境指紋：GPU `NVIDIA GeForce RTX 5090, 32607 MiB` ・ git `b68f725`（**working tree 有未 commit 變更**）
+環境指紋：GPU `NVIDIA GeForce RTX 5090, 32607 MiB` ・ git `49bd84a`（**working tree 有未 commit 變更**）
 
 ## Leaderboard（7-circuit avg HPWL，排除 bigblue2，越低越好）
 
-參考點：paper 已發表 **46.89** ・ 我們自己跑 paper checkpoint 的 anchor **45.987**（n=1，`base_cu128_*`，現行 stack）
+參考點：paper 已發表 **46.89** ・ 我們自己跑 paper checkpoint（`base_cu128_*`，現行 stack）：avg7 **45.987**（n=1） ・ avg6 [無 bigblue4] **31.212**（n=3, sd 0.814）
+
+avg6 = 六個便宜 circuit（bigblue4 佔 eval 時間 78%，3-seed 協定只在 seed 300 跑它）。同 stack 的 2σ 雜訊帶 = 2 × avg6 sd；差距小於它的結果不算差距。
 
 這張表只含**磁碟上還有 metrics.csv 的 run**。有些歷史結果（Ablation_10k 44.01、DDPO v2 44.65、AddLoss v1 等）的原始檔已被 eval 目錄碰撞覆蓋，只存在於報告中 — 那些要看 `docs/all_experiments_summary.csv`。兩張表不一致是預期的，差異本身就是資訊。
 
-| avg7 | n | run group | seed | checkpoint |
-|-----:|--:|-----------|------|------------|
-| 44.103 | 7 | `ispd2005-s0.svdd_p5_runH_s301.301` | 301 | `large-v2 (paper)` |
-| 44.321 | 7 | `ispd2005-s0.svdd_p3_runF.300` | 300 | `v1.61-ddpo.ablation_supervised_10k.61/latest.ckpt` |
-| 44.485 | 7 | `ispd2005-s0.svdd_p3_runE.300` | 300 | `v1.61-ddpo.ablation_supervised_10k.61/latest.ckpt` |
-| 44.692 | 7 | `ispd2005-s0.code_p1_s301.301` | 301 | `large-v2 (paper)` |
-| 44.747 | 7 | `ispd2005-s0.eval_macro_only.600` | 600 | `v1.61-ddpo.ddpo_v2_ppo.61/latest.ckpt` |
-| 44.772 | 7 | `ispd2005-s0.tds_p1_s302.302` | 302 | `large-v2 (paper)` |
-| 44.973 | 7 | `ispd2005-s0.tds_p1_s300.300` | 300 | `large-v2 (paper)` |
-| 45.053 | 7 | `ispd2005-s0.fs_p1_X_full.300` | 300 | `v1.61-fs.61.fs_p1_X_500k.61/latest.ckpt` |
-| 45.078 | 7 | `ispd2005-s0.fs_p1_X_1.6M_full.300` | 300 | `v1.61-fs.61.fs_p1_X_3M.61/latest.ckpt` |
-| 45.097 | 7 | `ispd2005-s0.svdd_p4_runH.300` | 300 | `large-v2 (paper)` |
-| 45.121 | 7 | `ispd2005-s0.fs_p1_Y_full.300` | 300 | `v1.61-fs.61.fs_p1_Y_500k.61/latest.ckpt` |
-| 45.236 | 7 | `ispd2005-s0.eval_macro_only.300` | 300 | `v1.61-ddpo.addloss_v2.61/latest.ckpt` |
-| 45.335 | 7 | `ispd2005-s0.svdd_p5_runH_s302.302` | 302 | `large-v2 (paper)` |
-| 45.361 | 7 | `ispd2005-s0.code_p1_s300.300` | 300 | `large-v2 (paper)` |
-| 45.499 | 7 | `ispd2005-s0.tds_p1_s301.301` | 301 | `large-v2 (paper)` |
-| 45.596 | 7 | `ispd2005-s0.code_p1_s302.302` | 302 | `large-v2 (paper)` |
-| 45.700 | 7 | `ispd2005-s0.runF_cu128_s300.300` | 300 | `v1.61-ddpo.ablation_supervised_10k.61/latest.ckpt` |
-| 45.987 | 7 | `ispd2005-s0.base_cu128_s300.300` | 300 | `large-v2 (paper)` |
-| 46.014 | 7 | `ispd2005-s0.eval_macro_only.500` | 500 | `v1.61-ddpo.ddpo_v2_ppo.61/latest.ckpt` |
-| 46.380 | 7 | `ispd2005-s0.eval_macro_only.400` | 400 | `v1.61-ddpo.ddpo_v2_ppo.61/latest.ckpt` |
-| 46.441 | 7 | `ispd2005-s0.fs_stage2_full.300` | 300 | `v2.61.fs_p1_X_stage2_b32.61/latest.ckpt` |
-| 66.531 | 7 | `ispd2005-s0.svdd_p4_runG.300` | 300 | `large-v2 (paper)` |
-| 70.027 | 7 | `ispd2005-s0.fm_p1_nt50_full.300` | 300 | `v1.61-fs.61.fm_p1_500k.61/latest.ckpt` |
-| 71.944 | 7 | `ispd2005-s0.svdd_p2_runC.300` | 300 | `v1.61-ddpo.ablation_supervised_10k.61/latest.ckpt` |
-| 77.047 | 7 | `ispd2005-s0.fm_p1_full.300` | 300 | `v1.61-fs.61.fm_p1_500k.61/latest.ckpt` |
-| 81.245 | 7 | `ispd2005-s0.fm_p1_nt10_full.300` | 300 | `v1.61-fs.61.fm_p1_500k.61/latest.ckpt` |
-| 84.854 | 7 | `ispd2005-s0.svdd_p2_runA.300` | 300 | `v1.61-ddpo.ablation_supervised_10k.61/latest.ckpt` |
+| avg7 | avg6 | circuits | run group | seed | checkpoint |
+|-----:|-----:|---------:|-----------|------|------------|
+| 46.441 | 29.915 | 7 | `ispd2005-s0.fs_stage2_full.300` | 300 | `v2.61.fs_p1_X_stage2_b32.61/latest.ckpt` |
+| 44.692 | 30.269 | 7 | `ispd2005-s0.code_p1_s301.301` | 301 | `large-v2 (paper)` |
+| 44.485 | 30.341 | 7 | `ispd2005-s0.svdd_p3_runE.300` | 300 | `v1.61-ddpo.ablation_supervised_10k.61/latest.ckpt` |
+| — | 30.443 | 6 | `ispd2005-s0.base_cu128_s302.302` | 302 | `large-v2 (paper)` |
+| 44.772 | 30.461 | 7 | `ispd2005-s0.tds_p1_s302.302` | 302 | `large-v2 (paper)` |
+| 44.747 | 30.489 | 7 | `ispd2005-s0.eval_macro_only.600` | 600 | `v1.61-ddpo.ddpo_v2_ppo.61/latest.ckpt` |
+| 44.973 | 30.756 | 7 | `ispd2005-s0.tds_p1_s300.300` | 300 | `large-v2 (paper)` |
+| 45.121 | 30.792 | 7 | `ispd2005-s0.fs_p1_Y_full.300` | 300 | `v1.61-fs.61.fs_p1_Y_500k.61/latest.ckpt` |
+| 44.321 | 30.829 | 7 | `ispd2005-s0.svdd_p3_runF.300` | 300 | `v1.61-ddpo.ablation_supervised_10k.61/latest.ckpt` |
+| 45.053 | 31.024 | 7 | `ispd2005-s0.fs_p1_X_full.300` | 300 | `v1.61-fs.61.fs_p1_X_500k.61/latest.ckpt` |
+| 45.078 | 31.063 | 7 | `ispd2005-s0.fs_p1_X_1.6M_full.300` | 300 | `v1.61-fs.61.fs_p1_X_3M.61/latest.ckpt` |
+| — | 31.130 | 6 | `ispd2005-s0.base_cu128_s301.301` | 301 | `large-v2 (paper)` |
+| 45.236 | 31.141 | 7 | `ispd2005-s0.eval_macro_only.300` | 300 | `v1.61-ddpo.addloss_v2.61/latest.ckpt` |
+| 44.103 | 31.160 | 7 | `ispd2005-s0.svdd_p5_runH_s301.301` | 301 | `large-v2 (paper)` |
+| 45.335 | 31.163 | 7 | `ispd2005-s0.svdd_p5_runH_s302.302` | 302 | `large-v2 (paper)` |
+| 45.700 | 31.184 | 7 | `ispd2005-s0.runF_cu128_s300.300` | 300 | `v1.61-ddpo.ablation_supervised_10k.61/latest.ckpt` |
+| 45.361 | 31.274 | 7 | `ispd2005-s0.code_p1_s300.300` | 300 | `large-v2 (paper)` |
+| 45.499 | 31.732 | 7 | `ispd2005-s0.tds_p1_s301.301` | 301 | `large-v2 (paper)` |
+| 45.596 | 31.768 | 7 | `ispd2005-s0.code_p1_s302.302` | 302 | `large-v2 (paper)` |
+| 45.097 | 31.896 | 7 | `ispd2005-s0.svdd_p4_runH.300` | 300 | `large-v2 (paper)` |
+| 45.987 | 32.064 | 7 | `ispd2005-s0.base_cu128_s300.300` | 300 | `large-v2 (paper)` |
+| 46.014 | 32.257 | 7 | `ispd2005-s0.eval_macro_only.500` | 500 | `v1.61-ddpo.ddpo_v2_ppo.61/latest.ckpt` |
+| 46.380 | 32.354 | 7 | `ispd2005-s0.eval_macro_only.400` | 400 | `v1.61-ddpo.ddpo_v2_ppo.61/latest.ckpt` |
+| 71.944 | 36.983 | 7 | `ispd2005-s0.svdd_p2_runC.300` | 300 | `v1.61-ddpo.ablation_supervised_10k.61/latest.ckpt` |
+| 70.027 | 37.063 | 7 | `ispd2005-s0.fm_p1_nt50_full.300` | 300 | `v1.61-fs.61.fm_p1_500k.61/latest.ckpt` |
+| 66.531 | 37.478 | 7 | `ispd2005-s0.svdd_p4_runG.300` | 300 | `large-v2 (paper)` |
+| 81.245 | 40.014 | 7 | `ispd2005-s0.fm_p1_nt10_full.300` | 300 | `v1.61-fs.61.fm_p1_500k.61/latest.ckpt` |
+| 77.047 | 43.753 | 7 | `ispd2005-s0.fm_p1_full.300` | 300 | `v1.61-fs.61.fm_p1_500k.61/latest.ckpt` |
+| 84.854 | 47.796 | 7 | `ispd2005-s0.svdd_p2_runA.300` | 300 | `v1.61-ddpo.ablation_supervised_10k.61/latest.ckpt` |
 
 ## ⚠ 中斷的 eval（跑到一半，既不是 done 也不是 orphan）
 
