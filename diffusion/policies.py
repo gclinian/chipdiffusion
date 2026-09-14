@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+import json
 import time
 import utils
 import clustering
@@ -153,21 +154,94 @@ def open_loop_multi(model, x_in, cond, num_attempts, score_fn):
     # x_in: (B, V, F)
     # samples: (B, V, F)
     # generate batch of samples, only return the best according to score_fn
-    # assumes 0 score is lowest possible
+    # score_fn: (sample, cond) -> float, higher is better (may be negative)
     B, V, F = x_in.shape
     assert B == 1, "open-loop (multi) policy cannot run in batched mode"
 
     samples, _ = model.reverse_samples(num_attempts, x_in, cond)
     intermediates = []
     argmax = 0
-    max_score = 0
+    max_score = -float("inf")
     for i in range(samples.shape[0]):
-        score = score_fn(samples[i])
+        score = score_fn(samples[i], cond)
         if score > max_score:
             argmax = i
             max_score = score
         intermediates.append(samples[i:i+1])
     return samples[argmax:argmax+1], intermediates
+
+def open_loop_best_of_n(
+        model,
+        x_in,
+        cond,
+        num_candidates,
+        x_original,
+        legality_floor = 0.97,
+        legalization_fn = None,
+        pin_cache = None,
+        save_videos = False,
+        ):
+    """
+    Best-of-N over open_loop: draw num_candidates placements and keep the one with the
+    lowest HPWL among those clearing legality_floor. If none clear it, keep the most
+    legal one (lowest HPWL breaks ties).
+
+    Candidates are drawn SEQUENTIALLY at B=1 rather than as one B=num_candidates batch
+    on purpose: guided sampling carries a single scalar Lagrange multiplier
+    (model.alpha) that is shared across the batch, so a B=N batch is not N independent
+    draws. Every reverse_samples entry point calls reset_guidance_state, so each B=1
+    call starts from alpha_init. This costs N times the sampling time.
+
+    Selection uses pre-legalization HPWL. If legalization_fn is given, every candidate
+    is legalized and the selection is made on post-legalization HPWL instead -- the
+    reference protocol for checking whether the pre-legalization ranking is
+    trustworthy, at N times the legalization cost.
+    Returns: sample, metrics, metrics_special, legalization_output (None unless the
+    candidates were legalized here, in which case it is the winner's).
+    """
+    samples, specials, legalization_outputs = [], [], []
+    hpwl_pre, legality_pre, hpwl_post, legality_post = [], [], [], []
+    for i in range(num_candidates):
+        sample, _, sample_special = open_loop(1, model, x_in, cond, intermediate_every = 0, save_videos = save_videos)
+        h, l = utils.placement_quality(sample[0], x_original, cond, pin_cache = pin_cache)
+        hpwl_pre.append(h)
+        legality_pre.append(l)
+        report = f"  candidate {i+1}/{num_candidates}: hpwl_pre={h:.2f} macro_legality_pre={l:.5f}"
+        if legalization_fn is not None:
+            sample, legalization_metrics, legalization_metrics_special = legalization_fn(sample, cond)
+            legalization_outputs.append((legalization_metrics, legalization_metrics_special))
+            h, l = utils.placement_quality(sample[0], x_original, cond, pin_cache = pin_cache)
+            hpwl_post.append(h)
+            legality_post.append(l)
+            report += f" hpwl_post={h:.2f} macro_legality_post={l:.5f}"
+        samples.append(sample)
+        specials.append(sample_special)
+        print(report, flush = True)
+
+    legalize_all = legalization_fn is not None
+    hpwls = hpwl_post if legalize_all else hpwl_pre
+    legalities = legality_post if legalize_all else legality_pre
+    passing = [i for i in range(num_candidates) if legalities[i] >= legality_floor]
+    if passing:
+        best = min(passing, key = lambda i: hpwls[i])
+    else:
+        best = max(range(num_candidates), key = lambda i: (legalities[i], -hpwls[i]))
+    print(f"  chose candidate {best+1}/{num_candidates} ({len(passing)} cleared legality floor {legality_floor})", flush = True)
+
+    metrics = {
+        "chosen_candidate_idx": best,
+        "num_candidates": num_candidates,
+        "hpwl_pre_legalization": hpwl_pre[best],
+        "macro_legality_pre_legalization": legality_pre[best],
+        "candidates_hpwl_pre": json.dumps([round(v, 4) for v in hpwl_pre]),
+        "candidates_macro_legality_pre": json.dumps([round(v, 6) for v in legality_pre]),
+    }
+    if legalize_all:
+        metrics.update({
+            "candidates_hpwl_post": json.dumps([round(v, 4) for v in hpwl_post]),
+            "candidates_macro_legality_post": json.dumps([round(v, 6) for v in legality_post]),
+        })
+    return samples[best], metrics, specials[best], (legalization_outputs[best] if legalize_all else None)
 
 def iterative(model, x_in, cond, score_fn, num_iter = 4):
     # sort nodes by decreasing size NOTE: experiment with other options for sorting?

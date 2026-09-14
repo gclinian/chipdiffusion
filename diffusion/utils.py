@@ -127,7 +127,7 @@ def display_graph_samples(batch_size, x_val, cond_val, model, logger, intermedia
         samples, intermediates = policies.open_loop_clustered(batch_size, model, x_val, cond_val, intermediate_every = intermediate_every)
     elif policy == "open_loop_multi":
         samples, intermediates = policies.open_loop_multi(
-            model, x_val, cond_val, num_attempts = 8, score_fn = lambda x: check_legality(x, x_val[0], cond_val.x, cond_val.is_ports, True)
+            model, x_val, cond_val, num_attempts = 8, score_fn = lambda x, cond: check_legality(x, x_val[0], cond.x, cond.is_ports, True)
             )
     elif policy == "iterative":
         samples, intermediates, masks, info = policies.iterative(
@@ -212,12 +212,18 @@ def save_outputs(
     preprocess_fn=None, 
     postprocess_fn=None, 
     legalization_fn=None,
+    num_candidates=1,
+    candidate_legality_floor=0.97,
+    legalize_all_candidates=False,
     ): 
     """
     x_in and cond are both assumed to be on CPU
     x_in has shape (V, 2)
     preprocess_fn: x_in, cond -> x_in, cond
     postprocess_fn: sample, cond -> sample
+    num_candidates > 1 enables best-of-N (open_loop policy only): N candidates are
+    drawn sequentially and only the winner is legalized, unless legalize_all_candidates
+    is set, in which case all are legalized and ranked post-legalization.
     Returns:
     - metrics: Dict
     - sample: (V, 2) tensor 
@@ -236,11 +242,28 @@ def save_outputs(
     x_preprocessed, cond_preprocessed = preprocess_fn(x_in, cond) if preprocess_fn is not None else (x_in, cond)
 
     t1 = time.time()
+    pin_cache = None # (pin_map, pin_offsets, pin_edge_index) for cond_preprocessed, computed once
+    candidate_metrics = {}
+    winner_legalization = None # set when best-of-N already legalized the chosen candidate
     if cond_preprocessed.num_nodes == 0:
         # handle edge case with 0 nodes after preprocessing
         sample = torch.zeros_like(x_preprocessed)
     else:
-        if policy == "open_loop":
+        pin_cache = guidance.compute_pin_map(cond_preprocessed)
+        if policy == "open_loop" and num_candidates > 1:
+            sample, candidate_metrics, policy_metrics_special, winner_legalization = policies.open_loop_best_of_n(
+                model,
+                x_preprocessed,
+                cond_preprocessed,
+                num_candidates,
+                x_in[0],
+                legality_floor = candidate_legality_floor,
+                legalization_fn = legalization_fn if legalize_all_candidates else None,
+                pin_cache = pin_cache,
+                save_videos = policy_kwargs["save_videos"],
+                )
+            metrics_special.update(policy_metrics_special)
+        elif policy == "open_loop":
             sample, _, policy_metrics_special = policies.open_loop(1, model, x_preprocessed, cond_preprocessed, intermediate_every = 0, save_videos = policy_kwargs["save_videos"])
             metrics_special.update(policy_metrics_special)
         elif policy == "open_loop_clustered":
@@ -258,8 +281,23 @@ def save_outputs(
     # save image too
     image = visualize_placement(sample[0], cond_preprocessed, plot_pins=True, plot_edges=False, img_size=(2048, 2048))
 
-    # legalization
-    if legalization_fn is not None:
+    # quality of the generated placement before legalization. same units as the
+    # hpwl_rescaled / macro_legality columns below, so the pair is directly comparable
+    if candidate_metrics:
+        metrics.update(candidate_metrics) # already measured per candidate by the search
+    else:
+        hpwl_pre, macro_legality_pre = placement_quality(sample[0], x_in[0], cond_preprocessed, pin_cache = pin_cache)
+        metrics.update({
+            "hpwl_pre_legalization": hpwl_pre,
+            "macro_legality_pre_legalization": macro_legality_pre,
+            })
+
+    # legalization (already done during the search when legalize_all_candidates is set)
+    if winner_legalization is not None:
+        metrics.update(winner_legalization[0])
+        metrics_special.update(winner_legalization[1])
+        image_legalized = visualize_placement(sample[0], cond_preprocessed, plot_pins=True, plot_edges=False, img_size=(2048, 2048))
+    elif legalization_fn is not None:
         sample, legalization_metrics, legalization_metrics_special = legalization_fn(sample, cond_preprocessed)
         metrics.update(legalization_metrics)
         metrics_special.update(legalization_metrics_special)
@@ -280,7 +318,7 @@ def save_outputs(
     t3 = time.time()
     
     # evaluate sample and generate sampling metrics
-    hpwl_normalized, hpwl_rescaled = hpwl_fast(sample_unprocessed[0], cond_preprocessed, normalized_hpwl=False)
+    hpwl_normalized, hpwl_rescaled = hpwl_fast(sample_unprocessed[0], cond_preprocessed, normalized_hpwl=False, pin_cache=pin_cache)
     macro_hpwl_normalized, macro_hpwl_rescaled = macro_hpwl(sample_unprocessed[0], cond_preprocessed, normalized_hpwl=False)
     legality = check_legality_new(sample_unprocessed[0], x_in[0], cond_preprocessed, cond_preprocessed.is_ports, score=True)
     if "is_macros" in cond:
@@ -1098,13 +1136,15 @@ def hpwl(samples, cond_val):
     hpwl = sum([(max(n[::2]) - min(n[::2])) + (max(n[1::2]) - min(n[1::2])) for n in nets.values()])
     return hpwl
 
-def hpwl_fast(x, cond, normalized_hpwl = True):
+def hpwl_fast(x, cond, normalized_hpwl = True, pin_cache = None):
     """
     Returns hpwl computed using custom GNN trick
     If not normalized_hpwl, will return both normalized HPWL, as well as rescaled HPWL (using original units)
+    pin_cache is an optional (pin_map, pin_offsets, pin_edge_index) tuple from
+    guidance.compute_pin_map(cond), to avoid recomputing it per call for a fixed netlist
     """
     hpwl_net = guidance.HPWL()
-    pin_map, pin_offsets, pin_edge_index = guidance.compute_pin_map(cond)
+    pin_map, pin_offsets, pin_edge_index = guidance.compute_pin_map(cond) if pin_cache is None else pin_cache
     hpwl_net = hpwl_net(x, pin_map, pin_offsets, pin_edge_index, net_aggr="sum", raw_output = (not normalized_hpwl))
     if normalized_hpwl:
         return hpwl_net.item() # output is hpwl, no additional processing needed
@@ -1120,6 +1160,20 @@ def hpwl_fast(x, cond, normalized_hpwl = True):
         norm_hpwl = hpwl_net.sum(dim=-1).sum(dim=-1)
         return norm_hpwl.item(), rescaled_hpwl.item()
     
+def placement_quality(x, x_original, cond, pin_cache = None):
+    """
+    Rescaled HPWL and macro legality of a single placement x (V, 2).
+    Identical definitions (and units) to the hpwl_rescaled / macro_legality columns,
+    so a pre-legalization value is directly comparable to the post-legalization one.
+    NOTE macro legality is 0.0 when cond carries no is_macros, matching macro_legality.
+    """
+    _, hpwl_rescaled = hpwl_fast(x, cond, normalized_hpwl = False, pin_cache = pin_cache)
+    if "is_macros" in cond:
+        legality = check_legality_new(x, x_original, cond, (~cond.is_macros) | cond.is_ports, score = True)
+    else:
+        legality = 0.0
+    return hpwl_rescaled, legality
+
 def macro_hpwl(x, cond, normalized_hpwl = True):
     """ 
     Computes macro HPWL

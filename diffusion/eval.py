@@ -276,6 +276,11 @@ def main(cfg):
     log_metrics = common.Metrics()
     start_sample = cfg.get("start_sample", 0)
     skip_guidance_threshold = cfg.get("skip_guidance_threshold", 0)  # 0 = never skip
+    num_candidates = cfg.get("num_candidates", 1)  # 1 = one sample, i.e. current behaviour
+    candidate_legality_floor = cfg.get("candidate_legality_floor", 0.97)
+    legalize_all_candidates = cfg.get("legalize_all_candidates", False)
+    if num_candidates > 1 and cfg.eval_policy_algorithm != "open_loop":
+        raise ValueError(f"num_candidates>1 needs eval_policy_algorithm=open_loop, got {cfg.eval_policy_algorithm}")
     for i in range(start_sample, cfg.num_output_samples):
         x, cond = val_set[i]
         # Temporarily disable guidance for large circuits to avoid OOM
@@ -302,6 +307,9 @@ def main(cfg):
             preprocess_fn=preprocess_fn,
             postprocess_fn=postprocess_fn,
             legalization_fn=legalize_fn,
+            num_candidates=num_candidates,
+            candidate_legality_floor=candidate_legality_floor,
+            legalize_all_candidates=legalize_all_candidates,
         )
         print(f"Finished sample {i+1} of {cfg.num_output_samples} \t {metrics}")
         # Restore guidance mode if it was disabled
@@ -331,7 +339,7 @@ def main(cfg):
                 output_metrics[k].append(v)
             else:
                 output_metrics[k] = [v]
-        log_metrics.add(metrics)
+        log_metrics.add({k: v for k, v in metrics.items() if not isinstance(v, str)})
     utils.dict_to_csv(output_metrics, os.path.join(log_dir,"metrics.csv"))
     _ledger_record(log_dir)
     for plot_keys in cfg.scatter_plots:
