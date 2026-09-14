@@ -62,7 +62,24 @@
   這是 **協定** 不是方法主張；論文表要標 N 與 wall-clock。
 - 成本 ~2.5 h。
 
-## Phase 3 — 視 Phase 1/2 結果（不預先承諾）
+## Phase 3 — Skeptic 存活的三個零訓練測試（2026-09-14 追加，預登記）
+GPU 序列排在 Phase 2 與 1A follow-up 之後。全部 seed 300 先行；任何 cell 通過門檻才補 seed 301/302。
+
+### 3E Deep guidance K（MacroDiff+；config-only）
+- Cells：bigblue4，K ∈ {60, 150} × `model.alpha_critical_factor` ∈ {0.5（現況）, 1.0}；adaptec1 K=150。
+  對照 0a（K=20）。skeptic 警告：α dual ascent 在 K 迴圈內，phase 1 α_init=0 → 純 HPWL 深 K 會疊 macro，
+  故加 acf=1.0 變因。
+- **判定**：bigblue4 任一 cell 比 0a 好 ≥ 5%（≈6.5）且 legality ≥ 0.98 → 補 seeds；否則關閉。
+### 3F Post-hoc 權重平均（EMA 的零訓練代理）
+- 對 `v1.61-fs.61.fs_p1_X_500k.61/step_{250k..500k}.ckpt` 做均勻平均 → `fs_p1_X_500k_avg.ckpt`；
+  7-circuit eval；對照 **同 stack 重跑的 Run X 500k**（舊 45.053 是舊 stack，不可用）。
+- **判定**：avg7 比 Run X（新 stack）好 ≥ 1.3 → 值得做真 EMA 訓練；否則配方方向關閉。
+### 3H Frame averaging（D4 test-time symmetrization）
+- `+model.frame_average=true`（8 frames，4 個 ε_θ call site），large-v2 + opt，adaptec1 + bigblue4。
+- **判定**：bigblue4 比 0a 好 ≥ 5% 或 adaptec1 好 ≥ 3%（其 σ 小）→ 7 circuits + seeds；否則關閉。
+- 成本警告：推論 ~8× 慢；bigblue4 cell 預估 60–70 min。
+
+## Phase 3（舊）— 視 Phase 1/2 結果（不預先承諾）
 - 1B 若 T=100 可用 → Phase 2 用 draft 加 N。
 - EMA + cosine LR + grad clip 配方（`recipe_plan_1.md`，8 h 訓練）— 若 GPU 有空檔就跑，作為新預設。
 - 方向六 `eval_policy_algorithm=iterative_clustering` config probe on bigblue2（32 GB 現在可能放得下 guidance）。

@@ -134,16 +134,41 @@ V 從訓練 400/1600 到測試 543–23,084，log-ratio 達 4 nats。
   α_init=0 所以 deep K 是純 HPWL 目標 → macro 全疊在一起。
 - 最便宜的測試：離線 drift probe（0.05 GPU-h），K∈{20,60,150,300} 看 ‖g‖ 與 legality potential 是否爆。
 
-### 4.5 訓練配方：EMA + cosine LR + grad clip（EDM2, CVPR 2024）
+### 4.5 訓練配方：EMA + cosine LR + grad clip（EDM2, CVPR 2024）— skeptic 後 **weak**
 `train_graph.py` 沒有 EMA、LR schedule、warmup、grad clip、weight decay。這是 2020 以來每篇
 diffusion paper 的標配。~40–50 LOC；EMA checkpoint 是 `from_checkpoint` 的 drop-in，guidance /
-search / legalizer 全不動。高信心小正效果；低信心單獨超過 1.3。**定位：新的預設配方**，不是主張。
-（Skeptic pass 重跑中。）
+search / legalizer 全不動。高信心小正效果；低信心單獨超過 1.3。
+- **Skeptic（已完成）**：訓練量不是瓶頸 — FromScratch_X 500k = 45.053 vs 1.6M = 45.078（磁碟上已有）；
+  偵測下限 ~1.2 vs 候選自估 0.45。**最便宜的測試零訓練**：`v1.61-fs.61.fs_p1_X_500k.61/` 有 10 個
+  50k 間隔的 snapshot，做 post-hoc 權重平均（SWA/soup 式）出一個 ckpt 再 eval（~1.1 GPU-h）。
+  排 Phase 3。
 
-### 4.6 Scale conditioning / hierarchical（SBGD 2508.14352；Hier-RTLMP 2304.11761）
+### 4.6 Scale conditioning / hierarchical（SBGD 2508.14352；Hier-RTLMP 2304.11761）— skeptic 後 **weak**
 唯一直接**攻擊** size-OOD 機制的方向（網路現在完全不知道 circuit 多大）。但成本最高、變異最大，
 且有陷阱：conditioning 值本身（V=8170）也 OOD。分階段：先跑 config 級的
 `eval_policy_algorithm=iterative_clustering`（方向六，程式碼已在、123 個 run 從沒開過）。
+- **Skeptic（已完成）— 前提為假**：對 `docs/ledger/results/` 全部結果回歸 quality vs macro 數：
+  hpwl_ratio 在 bigblue4 (8,170) **最好** (0.615)，legality 隨 V 上升；我們對 paper / OrderPlace 的
+  劣勢全在 **543–1,329 macro** 的 circuit。「size-OOD」是 FM 的故事，不是 DDPM+guidance 的。
+  另：repo 內沒有 macro clustering（`utils.py:1315` 與 `parsing/utils.py:339` 都跳過 macro），
+  config probe 是 no-op。**關閉。**
+
+### 4.7 Exact D4 equivariance by frame averaging（test-time symmetrization）— skeptic 後 **worth_a_pilot**
+Repo 已證明 dihedral D4 對 HPWL/legality 不變（`utils.dihedral_transform_graph`）；訓練端 augmentation
+（Run C）從未 eval。推論端等價做法：ε̄ = (1/8) Σ_g g⁻¹ ε_θ(g·x, g·cond)，零訓練、任何 checkpoint。
+- **Skeptic 跑了 3 個 GPU probe（~0.15 GPU-h，paper ckpt + 真實 ISPD 圖）仍無法在機制上推翻**；
+  不改 sampler 的 stochasticity、步數或 ODE/SDE 性質，與 1B/1C 正交。
+- Hidden cost：4 個 ε_θ call site（plain + svdd ×2 + code/tds）；`BatchWrapper` 在 B·E > 80k 會 chunk，
+  8 個 frame 無法 fuse 成一個 batched forward → 推論 ~8× 慢（bigblue4 sampling ~+50 min）。
+- 最便宜測試：`+model.frame_average=true`，adaptec1 + bigblue4，seed 300，~0.4–1 GPU-h。排 Phase 3。
+
+### 4.8 其餘 skeptic 判定（全部 weak，不排）
+Attention temperature log-V scaling（skeptic 實跑 probe：各 circuit 最佳溫度與 V 無序）；
+AR-hybrid commit-and-freeze（mask/conditioning 通道是死碼：`is_ports` 在全部訓練資料恆為 0，
+該輸入通道權重仍在初始值）；MultiDiffusion 子圖融合（訓練樣本由 75–90% 密度定義而非節點數；
+子圖不能 batch）；RePaint/Restart 式 test-time refinement（Lagrangian α 是 x 之外的狀態，
+re-noise 無法收縮它）；DDPM-IP / offset noise；FlowPlace 硬投影（該投影算子 repo 內不存在，
+每步要比 20k-step legalizer 快 1000×）。
 
 ---
 
@@ -174,8 +199,9 @@ search / legalizer 全不動。高信心小正效果；低信心單獨超過 1.3
 | C | Log-SNR shift by V | scheduler ~8 行 | 否 | 否 | pilot | ~25 min/seed | size-OOD 是否可用 schedule 修 |
 | D | Best-of-N 協定 | policies bug fix + logging | 否 | 否 | pilot（已排程）| ~30 LOC, ~2.5 h | 可報告的 43.1 |
 | E | Deep guidance K | config + probe | 否 | 否 | pilot | 0 LOC probe | K=20 是否欠調 |
-| F | EMA + LR 配方 | train loop ~50 LOC | 8 h | 否 | strong（待 skeptic）| 8 h + 3 seeds | 新預設 |
-| G | Scale cond. / hierarchical | 網路 + data | 8 h+ | 否（但有自己的 OOD 陷阱）| pilot（先 config probe）| 週 | bigblue2/4 |
+| F | Post-hoc 權重平均（EMA 的零訓練版）| 小腳本 | 否 | 否 | weak→probe | ~1.1 GPU-h | 訓練配方是否值得 |
+| G | Scale cond. / hierarchical | — | — | — | **關閉**（前提為假：quality 不隨 V 退化）| — | — |
+| H | Frame averaging (D4) | 4 個 call site ~40 LOC | 否 | 否 | pilot | ~1 GPU-h | 對稱性是否值 |
 | — | Drifting model | 新 family + loader | 是 | **更糟** | weak | 週+ | 不做 |
 | — | MeanFlow / Shortcut / sCM / IMM / CTM | 新 family | 是 | **是** | weak | 天–週 | 不做 |
 | — | ODE→SDE / Restart on FM ckpt | sampler | 否 | partially | weak | — | 不做 |
@@ -195,7 +221,9 @@ search / legalizer 全不動。高信心小正效果；低信心單獨超過 1.3
 ---
 
 ## 8. 推薦執行順序 → `docs/plan/sampler_plan_1.md`
-Phase 0 重錨（Run F）→ Phase 1 三個診斷（A, B, C）→ Phase 2 Best-of-N（D）→ 視結果決定 F/G。
+Phase 0 重錨 → Phase 1 三個診斷（A ✅, B, C）→ Phase 2 Best-of-N（D）→ Phase 3 三個 skeptic 存活的便宜測試（E deep-K, F post-hoc 平均, H frame averaging）。
+
+**Skeptic pass 全部完成後的一句話**：28 個候選裡只剩 5 個零訓練測試值得跑；沒有任何一個需要新的生成範式或新 backbone。
 
 ## 9. 主要參考
 - Drifting: 2602.04770, 2603.12366, 2605.11755, 2605.10727 ・ Few-step: 2505.13447, 2410.12557, 2410.11081, 2310.02279
