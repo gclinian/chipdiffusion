@@ -370,7 +370,7 @@ def render_status():
     w("以 avg7 數值比對（2/3 位小數）而非目錄名，因為文件裡引用結果用的是方法名不是路徑。")
     w("")
     if uncited:
-        for g in sorted(uncited, key=lambda x: x["avg7"]):
+        for g in sorted(uncited, key=lambda x: x["avg7"] if x["avg7"] is not None else x["avg6"]):
             v = g['avg7'] if g['avg7'] is not None else g['avg6']
             w(f"- `{g['group']}` {'avg7' if g['avg7'] is not None else 'avg6'}={v:.3f}　_{g['mtime'][:10]}_")
     else:
