@@ -1,13 +1,13 @@
 # STATUS — 自動產生，不要手改
 
-由 `python3 scripts/ledger.py status` 產生於 **2026-09-14 11:07**。
+由 `python3 scripts/ledger.py status` 產生於 **2026-09-14 11:10**。
 來源：`docs/ledger/runs.jsonl`（138 runs）+ `docs/ledger/results/`（逐筆 metrics.csv 存檔）。
 
-環境指紋：GPU `NVIDIA GeForce RTX 5090, 32607 MiB` ・ git `e0fd9e2`（**working tree 有未 commit 變更**）
+環境指紋：GPU `NVIDIA GeForce RTX 5090, 32607 MiB` ・ git `056b7b3`（**working tree 有未 commit 變更**）
 
 ## Leaderboard（7-circuit avg HPWL，排除 bigblue2，越低越好）
 
-參考點：paper **46.89** ・ 我們對 paper checkpoint 的復現 **48.691**
+參考點：paper 已發表 **46.89** ・ 我們自己跑 paper checkpoint 的 anchor **45.987**（n=1，`base_cu128_*`，現行 stack）
 
 這張表只含**磁碟上還有 metrics.csv 的 run**。有些歷史結果（Ablation_10k 44.01、DDPO v2 44.65、AddLoss v1 等）的原始檔已被 eval 目錄碰撞覆蓋，只存在於報告中 — 那些要看 `docs/all_experiments_summary.csv`。兩張表不一致是預期的，差異本身就是資訊。
 
@@ -75,12 +75,12 @@
 
 以 avg7 數值比對（2/3 位小數）而非目錄名，因為文件裡引用結果用的是方法名不是路徑。
 
-- `ispd2005-s0.runF_cu128_s300.300` avg7=45.700　_2026-09-14_
+- 無
 
 ## 判讀規則（同時明文寫在 CLAUDE.md，工具關掉也有效）
 
 - 已測得的最大 across-seed σ = **0.654**（SVDD, n=3）。7-circuit avg 差距小於 **1.3** 的結果**不得用來關閉任何研究方向**。
 - 任何 n=1 的結果都不能成為禁令。禁令要分 **evidential**（有 Δ、有 seed 數）與 **prudential**（成本效益判斷）— 只有前者需要過統計門檻，後者要明說是判斷不是證據。
 - 決策 band 不得錨定在 n=1 或原始資料已遺失的基準數字上。
-- 微調結果只能對 48.691（我們自己的復現）比較，不能對 46.89（paper 已發表值）比較。
+- 任何方法只能對**同 stack、我們自己跑的 paper checkpoint** 比較（上方 anchor），不能對 46.89（paper 已發表值）或任何硬編碼舊數字比較。換 GPU/torch = 換 random stream，跨 stack 不可混比。
 

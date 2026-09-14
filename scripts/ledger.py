@@ -33,7 +33,7 @@ CORE7 = [0, 1, 2, 3, 4, 6, 7]          # bigblue2 (idx 5) excluded from the head
 SCREEN = {"0", "4"}                      # adaptec1/bigblue1: the cheap triage pair, a
                                          # deliberate shape, not a truncated 7-circuit run
 PAPER7 = 46.89
-REPRO7 = 48.691
+BASELINE_PREFIX = "ispd2005-s0.base_cu128_"   # our own runs of the paper checkpoint on the CURRENT stack
 SIGMA = 0.654                            # largest measured across-seed std (SVDD, n=3)
 PART_RE = re.compile(r"_(part\d+|bb\d+(_g\d+)?|adaptec\d+|bigblue\d+)(?=\.|$)")
 
@@ -231,6 +231,16 @@ def env_fingerprint():
     return fp
 
 
+def current_baseline(groups):
+    """Anchor for every comparison: mean avg7 of our own complete runs of the paper
+    checkpoint on the current stack (base_cu128_* groups). Never a hard-coded number —
+    the previous constant (48.691, a broken March-2026 run) misled the project for five
+    months. Returns (mean, n) or (None, 0)."""
+    vals = [g["avg7"] for g in groups.values()
+            if g["complete"] and g["group"].startswith(BASELINE_PREFIX)]
+    return (round(sum(vals) / len(vals), 3), len(vals)) if vals else (None, 0)
+
+
 # ---------- STATUS.md ----------
 
 def render_status():
@@ -259,7 +269,9 @@ def render_status():
                            []).append(g)
     w("## Leaderboard（7-circuit avg HPWL，排除 bigblue2，越低越好）")
     w("")
-    w(f"參考點：paper **{PAPER7}** ・ 我們對 paper checkpoint 的復現 **{REPRO7}**")
+    base, nb = current_baseline(groups)
+    anchor = f"**{base}**（n={nb}，`base_cu128_*`，現行 stack）" if base else "**尚未在現行 stack 量測**"
+    w(f"參考點：paper 已發表 **{PAPER7}** ・ 我們自己跑 paper checkpoint 的 anchor {anchor}")
     w("")
     w("這張表只含**磁碟上還有 metrics.csv 的 run**。有些歷史結果（Ablation_10k 44.01、"
       "DDPO v2 44.65、AddLoss v1 等）的原始檔已被 eval 目錄碰撞覆蓋，只存在於報告中 — "
@@ -336,7 +348,8 @@ def render_status():
     w("- 任何 n=1 的結果都不能成為禁令。禁令要分 **evidential**（有 Δ、有 seed 數）與 "
       "**prudential**（成本效益判斷）— 只有前者需要過統計門檻，後者要明說是判斷不是證據。")
     w("- 決策 band 不得錨定在 n=1 或原始資料已遺失的基準數字上。")
-    w("- 微調結果只能對 48.691（我們自己的復現）比較，不能對 46.89（paper 已發表值）比較。")
+    w("- 任何方法只能對**同 stack、我們自己跑的 paper checkpoint** 比較（上方 anchor），不能對 46.89"
+      "（paper 已發表值）或任何硬編碼舊數字比較。換 GPU/torch = 換 random stream，跨 stack 不可混比。")
     w("")
     return "\n".join(L) + "\n"
 
