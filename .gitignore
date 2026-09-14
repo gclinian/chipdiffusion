@@ -17,3 +17,6 @@ hmetis-1.5-linux/
 condaenv.*.requirements.txt
 # Claude Code local (machine-specific) settings — do not share
 .claude/settings.local.json
+
+# Claude Code agent worktrees (nested checkouts) — never commit
+.claude/worktrees/
