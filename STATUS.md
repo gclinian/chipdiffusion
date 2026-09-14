@@ -1,9 +1,9 @@
 # STATUS — 自動產生，不要手改
 
-由 `python3 scripts/ledger.py status` 產生於 **2026-09-14 11:31**。
+由 `python3 scripts/ledger.py status` 產生於 **2026-09-14 11:32**。
 來源：`docs/ledger/runs.jsonl`（142 runs）+ `docs/ledger/results/`（逐筆 metrics.csv 存檔）。
 
-環境指紋：GPU `NVIDIA GeForce RTX 5090, 32607 MiB` ・ git `49bd84a`（**working tree 有未 commit 變更**）
+環境指紋：GPU `NVIDIA GeForce RTX 5090, 32607 MiB` ・ git `3f9e725`（**working tree 有未 commit 變更**）
 
 ## Leaderboard（7-circuit avg HPWL，排除 bigblue2，越低越好）
 
@@ -13,12 +13,22 @@ avg6 = 六個便宜 circuit（bigblue4 佔 eval 時間 78%，3-seed 協定只在
 
 這張表只含**磁碟上還有 metrics.csv 的 run**。有些歷史結果（Ablation_10k 44.01、DDPO v2 44.65、AddLoss v1 等）的原始檔已被 eval 目錄碰撞覆蓋，只存在於報告中 — 那些要看 `docs/all_experiments_summary.csv`。兩張表不一致是預期的，差異本身就是資訊。
 
+### 現行 stack（2026-09-13 起，chipdiff-b）
+
+| avg7 | avg6 | circuits | run group | seed | checkpoint |
+|-----:|-----:|---------:|-----------|------|------------|
+| — | 30.443 | 6 | `ispd2005-s0.base_cu128_s302.302` | 302 | `large-v2 (paper)` |
+| — | 31.130 | 6 | `ispd2005-s0.base_cu128_s301.301` | 301 | `large-v2 (paper)` |
+| 45.700 | 31.184 | 7 | `ispd2005-s0.runF_cu128_s300.300` | 300 | `v1.61-ddpo.ablation_supervised_10k.61/latest.ckpt` |
+| 45.987 | 32.064 | 7 | `ispd2005-s0.base_cu128_s300.300` | 300 | `large-v2 (paper)` |
+
+### 舊 stack（2026-09-13 之前，torch 2.2.1 / 24 GB 卡）— 只能彼此比較，**不可與上表比較**
+
 | avg7 | avg6 | circuits | run group | seed | checkpoint |
 |-----:|-----:|---------:|-----------|------|------------|
 | 46.441 | 29.915 | 7 | `ispd2005-s0.fs_stage2_full.300` | 300 | `v2.61.fs_p1_X_stage2_b32.61/latest.ckpt` |
 | 44.692 | 30.269 | 7 | `ispd2005-s0.code_p1_s301.301` | 301 | `large-v2 (paper)` |
 | 44.485 | 30.341 | 7 | `ispd2005-s0.svdd_p3_runE.300` | 300 | `v1.61-ddpo.ablation_supervised_10k.61/latest.ckpt` |
-| — | 30.443 | 6 | `ispd2005-s0.base_cu128_s302.302` | 302 | `large-v2 (paper)` |
 | 44.772 | 30.461 | 7 | `ispd2005-s0.tds_p1_s302.302` | 302 | `large-v2 (paper)` |
 | 44.747 | 30.489 | 7 | `ispd2005-s0.eval_macro_only.600` | 600 | `v1.61-ddpo.ddpo_v2_ppo.61/latest.ckpt` |
 | 44.973 | 30.756 | 7 | `ispd2005-s0.tds_p1_s300.300` | 300 | `large-v2 (paper)` |
@@ -26,16 +36,13 @@ avg6 = 六個便宜 circuit（bigblue4 佔 eval 時間 78%，3-seed 協定只在
 | 44.321 | 30.829 | 7 | `ispd2005-s0.svdd_p3_runF.300` | 300 | `v1.61-ddpo.ablation_supervised_10k.61/latest.ckpt` |
 | 45.053 | 31.024 | 7 | `ispd2005-s0.fs_p1_X_full.300` | 300 | `v1.61-fs.61.fs_p1_X_500k.61/latest.ckpt` |
 | 45.078 | 31.063 | 7 | `ispd2005-s0.fs_p1_X_1.6M_full.300` | 300 | `v1.61-fs.61.fs_p1_X_3M.61/latest.ckpt` |
-| — | 31.130 | 6 | `ispd2005-s0.base_cu128_s301.301` | 301 | `large-v2 (paper)` |
 | 45.236 | 31.141 | 7 | `ispd2005-s0.eval_macro_only.300` | 300 | `v1.61-ddpo.addloss_v2.61/latest.ckpt` |
 | 44.103 | 31.160 | 7 | `ispd2005-s0.svdd_p5_runH_s301.301` | 301 | `large-v2 (paper)` |
 | 45.335 | 31.163 | 7 | `ispd2005-s0.svdd_p5_runH_s302.302` | 302 | `large-v2 (paper)` |
-| 45.700 | 31.184 | 7 | `ispd2005-s0.runF_cu128_s300.300` | 300 | `v1.61-ddpo.ablation_supervised_10k.61/latest.ckpt` |
 | 45.361 | 31.274 | 7 | `ispd2005-s0.code_p1_s300.300` | 300 | `large-v2 (paper)` |
 | 45.499 | 31.732 | 7 | `ispd2005-s0.tds_p1_s301.301` | 301 | `large-v2 (paper)` |
 | 45.596 | 31.768 | 7 | `ispd2005-s0.code_p1_s302.302` | 302 | `large-v2 (paper)` |
 | 45.097 | 31.896 | 7 | `ispd2005-s0.svdd_p4_runH.300` | 300 | `large-v2 (paper)` |
-| 45.987 | 32.064 | 7 | `ispd2005-s0.base_cu128_s300.300` | 300 | `large-v2 (paper)` |
 | 46.014 | 32.257 | 7 | `ispd2005-s0.eval_macro_only.500` | 500 | `v1.61-ddpo.ddpo_v2_ppo.61/latest.ckpt` |
 | 46.380 | 32.354 | 7 | `ispd2005-s0.eval_macro_only.400` | 400 | `v1.61-ddpo.ddpo_v2_ppo.61/latest.ckpt` |
 | 71.944 | 36.983 | 7 | `ispd2005-s0.svdd_p2_runC.300` | 300 | `v1.61-ddpo.ablation_supervised_10k.61/latest.ckpt` |

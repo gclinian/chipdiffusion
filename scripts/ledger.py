@@ -34,6 +34,7 @@ CORE6 = [0, 1, 2, 3, 4, 6]             # CORE7 minus bigblue4: the cheap 3-seed 
 SCREEN = {"0", "4"}                      # adaptec1/bigblue1: the cheap triage pair, a
                                          # deliberate shape, not a truncated 7-circuit run
 PAPER7 = 46.89
+STACK_CUTOVER = "2026-09-13"            # chipdiff-b (torch 2.11/cu128, RTX 5090) went live; earlier = old stack
 BASELINE_PREFIX = "ispd2005-s0.base_cu128_"   # our own runs of the paper checkpoint on the CURRENT stack
 SIGMA = 0.654                            # largest measured across-seed std (SVDD, n=3)
 PART_RE = re.compile(r"_(part\d+|bb\d+(_g\d+)?|adaptec\d+|bigblue\d+)(?=\.|$)")
@@ -295,14 +296,26 @@ def render_status():
       "DDPO v2 44.65、AddLoss v1 等）的原始檔已被 eval 目錄碰撞覆蓋，只存在於報告中 — "
       "那些要看 `docs/all_experiments_summary.csv`。兩張表不一致是預期的，差異本身就是資訊。")
     w("")
+    w(f"### 現行 stack（{STACK_CUTOVER} 起，chipdiff-b）")
+    w("")
     w("| avg7 | avg6 | circuits | run group | seed | checkpoint |")
     w("|-----:|-----:|---------:|-----------|------|------------|")
     rows_ = [g for g in groups.values() if g["complete"] or g["complete6"]]
-    for g in sorted(rows_, key=lambda x: (x["avg6"] if x["avg6"] is not None else 99, x["avg7"] or 99)):
-        ck = (g["from_checkpoint"] or "-").replace("../public-models/large-v2/large-v2.ckpt", "large-v2 (paper)")
-        a7 = f"{g['avg7']:.3f}" if g["avg7"] is not None else "—"
-        a6 = f"{g['avg6']:.3f}" if g["avg6"] is not None else "—"
-        w(f"| {a7} | {a6} | {g['n_circuits']} | `{g['group']}` | {g['seed'] or '-'} | `{ck}` |")
+    def emit(sub):
+        for g in sorted(sub, key=lambda x: (x["avg6"] if x["avg6"] is not None else 99, x["avg7"] or 99)):
+            ck = (g["from_checkpoint"] or "-").replace("../public-models/large-v2/large-v2.ckpt", "large-v2 (paper)")
+            a7 = f"{g['avg7']:.3f}" if g["avg7"] is not None else "—"
+            a6 = f"{g['avg6']:.3f}" if g["avg6"] is not None else "—"
+            w(f"| {a7} | {a6} | {g['n_circuits']} | `{g['group']}` | {g['seed'] or '-'} | `{ck}` |")
+    new_stack = [g for g in rows_ if g["mtime"][:10] >= STACK_CUTOVER]
+    old_stack = [g for g in rows_ if g["mtime"][:10] < STACK_CUTOVER]
+    emit(new_stack)
+    w("")
+    w(f"### 舊 stack（{STACK_CUTOVER} 之前，torch 2.2.1 / 24 GB 卡）— 只能彼此比較，**不可與上表比較**")
+    w("")
+    w("| avg7 | avg6 | circuits | run group | seed | checkpoint |")
+    w("|-----:|-----:|---------:|-----------|------|------------|")
+    emit(old_stack)
     w("")
 
     # --- work queues: the three states that actually go missing ---
