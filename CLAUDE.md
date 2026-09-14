@@ -3,7 +3,7 @@
 > 這個檔案是**工具全部關掉也還有效**的那一層。自動化（`scripts/ledger.py`、
 > `STATUS.md`）會失效、會忘記跑、會在別台機器上不存在；下面這些規則不會。
 
-## ⛔ 環境現況：目前跑不了任何 GPU 工作（2026-09-07）
+## 環境現況（2026-09-13 更新：已修復，用 `chipdiff-b`）
 
 伺服器 GPU 已換成 **RTX 5090（32,607 MiB，compute capability sm_120）**。
 `chipdiff` env 的 `torch 2.2.1+cu121` 編譯的 kernel 只到 `sm_90`：
@@ -21,8 +21,9 @@ RuntimeError: CUDA error: no kernel image is available for execution on the devi
 安裝任何需編譯的 PyG extension（`torch-scatter`/`sparse`/`cluster` 皆未安裝），
 所以是 pip 層級升級，不是 C++ 重編。
 
-**升級後第一件事：重跑 Run F（預期 44.32）驗證。** 不做這步，升級後的所有數字
-與磁碟上既有的 25 個結果都不可比。
+**升級已完成（2026-09-13，env `chipdiff-b`，torch 2.11.0+cu128）。** 重量結果：paper baseline
+45.987（舊 48.691 是壞 run）、Run F 45.700（舊 44.321，Δ ≥ 1.3 → 舊 stack 數字作廢）。
+見判讀規則 7 與 `docs/report/sampler_report_1.md`。
 
 副作用：VRAM 24 → 32.6 GB。bigblue2 guidance 舊估 30–35 GB，現在是邊緣可行，
 但那個估計是舊 torch/舊 allocator 下量的，要重新量測。
@@ -35,10 +36,14 @@ RuntimeError: CUDA error: no kernel image is available for execution on the devi
    **evidential**（有 Δ、有 seed 數 → 需 n≥3 且 |Δ| ≥ 2σ）還是
    **prudential**（成本效益判斷 → 明說「這是判斷不是證據」）。
 3. **決策 band 不得錨定在 n=1 或原始資料已遺失的數字上。**
-4. **Baseline framing。** 微調結果只能對 **48.691**（我們自己對 paper checkpoint
-   的復現）比較；**不能**對 46.89（paper 已發表值、不同 seed、未微調）比較。
-   對外最強且唯一有誤差棒的說法是 SVDD **44.845 ± 0.654**（3 seeds，在 paper
-   自己的 frozen checkpoint 上，零訓練）。
+4. **Baseline framing。** 任何方法只能對**同一 stack、同一 seed 集合、由我們自己跑的
+   paper checkpoint（large-v2 + opt）**比較；**不能**對 46.89（paper 已發表值、不同 seed）
+   比較，也**不能**對任何硬編碼的舊數字比較。歷史教訓：48.691（2026-03）被當 anchor 用了
+   五個月，2026-09 在新 stack 重量是 45.987 — 舊 run 是壞的。現行 anchor 看 `STATUS.md`
+   的 `base_cu128_*` 列。
+7. **換 GPU / torch = 換 random stream，舊 stack 與新 stack 的數字不可混比。** Run F 同
+   seed 跨 stack 差 +1.38（全在 σ 最大的 bigblue3/4）。升級後第一件事永遠是重量 baseline
+   與最佳方法各三 seed；預登記 gate 見 `docs/plan/sampler_plan_1.md` Phase 0。
 5. **跨 track 借用證據要標來源。** CoDe 與 TDS 的多條結論其實引用的是 SVDD 的
    單 seed run。
 6. **per-circuit 主張需要更高的門檻。** bigblue3 的 σ ≈ 5.34，是全專案 σ 的 8 倍；
