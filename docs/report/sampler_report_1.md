@@ -13,7 +13,8 @@
 - ✅ 0c：baseline 3 seeds avg6 = **31.212 ± 0.813** → 同 stack 2σ bar = 1.63（預登記 1.3 維持，另報 paired t）。
 - ✅ re-anchor：**微調 Δ=+0.002、SVDD Δ=−0.175（paired, n=3）— 兩個標題主張都是壞 baseline 的假象。**
 - ✅ 1B：unguided bigblue4 η=0/η=1 = **1.63 ≥ 1.30** → 確定性 sampler 在 OOD 崩潰，few-step 家族關閉；T=100 +7~14% → 不用 draft。
-- ⏳ 1C、**2a/2b（現在最關鍵）**、3E/3F/3H。
+- ✅ 1C：t-shift 兩方向皆未達 −1.3（up +5.72 因 bb4 +35%；inv −0.33）→ 關閉；符號與影像直覺相反。
+- ⏳ **2a/2b（現在最關鍵）**、3E/3F/3H、1A/1B evidential seeds。
 
 ---
 
@@ -143,8 +144,18 @@ few-step / drifting 家族**正式關閉（evidential；n=1，seed 301/302 已�
    拓撲上錯的擺放。
 Runs: `diag1B_opt_eta{00,05,10}_T{1000,100}_{a1,bb4}`、`diag1B_none_eta00_T1000_{a1,bb4}`。
 
-### 1C log-SNR shift by V ⏳
-（填表：s=√(V/400) 與 s=√(400/V)，7 circuits，對照 0a；判定 ≥1.3 → 跑 s301/302。）
+### 1C log-SNR shift by V（seed 300，large-v2 + opt，7 circuits）✅ — 兩個方向都關閉
+| grid warp | avg7 | Δ vs 0a | 逐 circuit Δ |
+|---|---:|---:|---|
+| s = √(V/400)（大 circuit 往高噪聲；SD3 直覺）| 51.705 | **+5.72** | a1 +2%, a2 +3%, a3 −1%, a4 −5%, bb1 +3%, bb3 −9%, **bb4 +35%**（s=4.52）|
+| s = √(400/V)（反向）| 45.656 | −0.33 | **a1 +15%, a2 +19%**, a3 +1%, a4 −4%, bb1 +4%, bb3 −5%, bb4 −5% |
+
+**預登記判定**（Δ ≤ −1.3 → 補 seed）：兩者皆未達 → **關閉**。
+觀察（n=1，per-circuit 主張依規則 6 僅為假說）：符號與影像領域的 SD3/simple-diffusion 直覺**相反** —
+把大 circuit 的 grid 往高噪聲移是災難（bb4 +35%），往低噪聲移對大 circuit 略好（bb3/bb4 −5%，~1.5σ）
+但重傷 in-distribution 的小 circuit（+15~19%）。這與 skeptic 的警告一致：Chen 的冗餘論證靠影像的
+空間平滑性，netlist placement 沒有這個性質。若日後要追，是 per-circuit-size 的 s 曲線而非單一公式，
+成本不值得。Runs: `diag1C_tshift_{up,inv}_part{1,2}`。
 
 ---
 

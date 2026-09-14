@@ -35,6 +35,8 @@
     sampler 在 size-OOD 崩潰（in-distribution 反而略好）；few-step/drifting 家族 evidential 關閉
     （seed 301/302 已排）。有 guidance 時 η=0 bb4 −4.9% / a1 +3.4%。**T=100 bb4 +7~14%，只省 43% 時間
     → Phase 2 不用 T=100 draft。**
+  - [x] **1C 完成**：t-shift up avg7 51.71（+5.72，bb4 +35%）、inv 45.66（−0.33）→ 兩方向關閉；
+    符號與 SD3 影像直覺相反（往低噪聲對大 circuit 略好但重傷小 circuit）。
 - [ ] 12.3 `docs/plan/sampler_plan_1.md` 執行中 — **In progress**
   - [x] 程式：`eta_scale` / `t_shift` sampler knobs（938e10e，39 行，defaults bit-identical）；
     best-of-N（e3ff934：`open_loop_multi` max_score bug 修正、`hpwl_pre_legalization` 永遠記錄、
