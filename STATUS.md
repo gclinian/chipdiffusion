@@ -1,9 +1,9 @@
 # STATUS — 自動產生，不要手改
 
-由 `python3 scripts/ledger.py status` 產生於 **2026-09-14 10:03**。
-來源：`docs/ledger/runs.jsonl`（130 runs）+ `docs/ledger/results/`（逐筆 metrics.csv 存檔）。
+由 `python3 scripts/ledger.py status` 產生於 **2026-09-14 10:35**。
+來源：`docs/ledger/runs.jsonl`（132 runs）+ `docs/ledger/results/`（逐筆 metrics.csv 存檔）。
 
-環境指紋：GPU `NVIDIA GeForce RTX 5090, 32607 MiB` ・ git `f0871b4`（**working tree 有未 commit 變更**）
+環境指紋：GPU `NVIDIA GeForce RTX 5090, 32607 MiB` ・ git `e149c94`（**working tree 有未 commit 變更**）
 
 ## Leaderboard（7-circuit avg HPWL，排除 bigblue2，越低越好）
 
@@ -29,6 +29,7 @@
 | 45.361 | 7 | `ispd2005-s0.code_p1_s300.300` | 300 | `large-v2 (paper)` |
 | 45.499 | 7 | `ispd2005-s0.tds_p1_s301.301` | 301 | `large-v2 (paper)` |
 | 45.596 | 7 | `ispd2005-s0.code_p1_s302.302` | 302 | `large-v2 (paper)` |
+| 45.700 | 7 | `ispd2005-s0.runF_cu128_s300.300` | 300 | `v1.61-ddpo.ablation_supervised_10k.61/latest.ckpt` |
 | 45.987 | 7 | `ispd2005-s0.base_cu128_s300.300` | 300 | `large-v2 (paper)` |
 | 46.014 | 7 | `ispd2005-s0.eval_macro_only.500` | 500 | `v1.61-ddpo.ddpo_v2_ppo.61/latest.ckpt` |
 | 46.380 | 7 | `ispd2005-s0.eval_macro_only.400` | 400 | `v1.61-ddpo.ddpo_v2_ppo.61/latest.ckpt` |
@@ -73,7 +74,7 @@
 
 以 avg7 數值比對（2/3 位小數）而非目錄名，因為文件裡引用結果用的是方法名不是路徑。
 
-- `ispd2005-s0.base_cu128_s300.300` avg7=45.987　_2026-09-13_
+- `ispd2005-s0.runF_cu128_s300.300` avg7=45.700　_2026-09-14_
 
 ## 判讀規則（同時明文寫在 CLAUDE.md，工具關掉也有效）
 

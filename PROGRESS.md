@@ -21,7 +21,12 @@
     落在 8.8–9.4，與新值 9.03 一致。
     **後果**：所有「−X% vs 48.691」的說法都灌水了。SVDD 44.845 vs 45.987 = Δ1.14 < 1.3（2σ）
     → SVDD 相對 paper 方法在同環境的優勢**尚未建立**。等 Run F 判定舊 stack 數字是否可信。
-  - [ ] Run F（ablation_10k + opt, seed 300, `runF_cu128_s300_part{1,2}`）對照舊 44.321 — running
+  - [x] Run F 新 stack seed 300 = **45.700**（舊 44.321，Δ=+1.379 ≥ 1.3 → **預登記 gate 觸發：舊 stack
+    數字不可與新 stack 混比**）。位移幾乎全在 bigblue3 +8.85 / bigblue4 +7.52（σ 最大的兩個 circuit）
+    → 換 GPU/torch 等於換 random stream，是 seed 量級的變動，不是系統性偏移。
+    **⚠ 同 seed 同 stack：微調 45.700 vs paper ckpt 45.987 = Δ−0.29，在雜訊帶內。** 專案標題
+    「微調贏 9.6%」是對壞掉的 baseline 量的。n=1，等 seed 301/302 再下結論。
+  - [ ] 依 gate：Run F s301/302 + SVDD_layered s300/301/302 在新 stack 重跑（已插到佇列最前）
 - [ ] 12.3 `docs/plan/sampler_plan_1.md` 執行中 — **In progress**
   - [x] 程式：`eta_scale` / `t_shift` sampler knobs（938e10e，39 行，defaults bit-identical）；
     best-of-N（e3ff934：`open_loop_multi` max_score bug 修正、`hpwl_pre_legalization` 永遠記錄、
