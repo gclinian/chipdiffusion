@@ -12,7 +12,8 @@
 - ✅ 1A：unguided FM / DDPM 在 bigblue4 = **2.45 ≥ 1.5** → FM 失敗在 objective/sampler，**維持關閉**。
 - ✅ 0c：baseline 3 seeds avg6 = **31.212 ± 0.813** → 同 stack 2σ bar = 1.63（預登記 1.3 維持，另報 paired t）。
 - ✅ re-anchor：**微調 Δ=+0.002、SVDD Δ=−0.175（paired, n=3）— 兩個標題主張都是壞 baseline 的假象。**
-- ⏳ 1B、1C、**2a/2b（現在最關鍵）**、3E/3F/3H。
+- ✅ 1B：unguided bigblue4 η=0/η=1 = **1.63 ≥ 1.30** → 確定性 sampler 在 OOD 崩潰，few-step 家族關閉；T=100 +7~14% → 不用 draft。
+- ⏳ 1C、**2a/2b（現在最關鍵）**、3E/3F/3H。
 
 ---
 
@@ -114,10 +115,33 @@ guidance 在 OOD circuit 上貢獻約 −52%。
 n=1；evidential 升級用 bigblue4 seed 301/302（`scripts/run_followup_1A_seeds.sh`，排 Phase 2 後）。
 Runs: `diag1A_{ddpm,fm}_none_{a1,bb4}`。
 
-### 1B stochasticity dial × steps ⏳
-先行資料（與 bon2a 同時跑，timing 受污染，HPWL 有效）：adaptec1 η=0（DDIM）= 9.34 vs η=1 = 9.03
-（+3.4%，legality 0.968 vs 0.974）。決定性的是 bigblue4，待佇列。
-（填表：η∈{0,0.5,1} × T∈{1000,100} × {a1,bb4}，opt；η∈{0,1} × T=1000，none。判定見 plan §1B。）
+### 1B stochasticity dial × steps（seed 300，large-v2）✅ — 確定性 sampler 在 OOD 崩潰
+| cell | adaptec1 | Δ | bigblue4 | Δ | bb4 pre-leg | legality | gen s |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| opt η=1.0 T=1000（0a）| 9.03 | — | 129.53 | — | — | 0.990 | 1013 |
+| opt η=0.5 T=1000 | 9.21 | +2.0% | 128.52 | −0.8% | 77.2 | 0.989 | 1009 |
+| opt η=0.0 T=1000 | 9.34 | +3.4% | **123.22** | **−4.9%** | 77.5 | 0.978 | 1009 |
+| opt η=1.0 T=100 | 9.29 | +2.8% | 138.32 | +6.8% | 75.6 | 0.992 | 573 |
+| opt η=0.5 T=100 | 9.29 | +2.8% | 144.29 | +11.4% | 76.1 | 0.993 | 592 |
+| opt η=0.0 T=100 | 9.52 | +5.3% | 147.66 | +14.0% | 74.3 | 0.990 | 573 |
+| **none η=1.0 T=1000（1A）** | 10.65 | — | 269.57 | — | 654 | 0.986 | 557 |
+| **none η=0.0 T=1000** | 10.17 | −4.5% | **439.18** | **+62.9%** | 889 | 0.991 | 547 |
+
+**預登記判定（unguided bigblue4，η=0 vs η=1）**：比值 **1.63 ≥ 1.30 → 確立**：deterministic sampler
+（DDIM）在 size-OOD circuit 崩潰，在 in-distribution 的 adaptec1 反而略好（−4.5%）。
+與 1A 合併解讀 FM 為何輸：**sampler 的確定性本身在 bigblue4 就值 +63%；FM 的 velocity objective
+再讓 raw 輸出差 3×**。兩者都有貢獻，前者是主因（FM-opt 267.8 ≈ DDPM-none 269.6 ≈ 0.6 × DDPM-none-η0 439）。
+few-step / drifting 家族**正式關閉（evidential；n=1，seed 301/302 已排在 3H 後）**。
+
+附帶結論：
+1. **有 guidance 時 η=0 在 bigblue4 反而 −4.9%、adaptec1 +3.4%**（adaptec1 σ=0.5% → 此差距可信；
+   bb4 σ~3–4% → ~1.3σ）。guidance 把 OOD 崩潰從 439 救回 123 — 這個系統的 OOD 穩健性來自
+   **stochasticity + guidance**，不在 model 本身。η 是一個可調的 in-distribution / OOD trade-off。
+2. **T=100 在每個 η 下 bigblue4 都 +7~14%**，且只省 43% wall-clock（legalization 20k steps 佔大頭）。
+   Plan §1B 的「T=100 < +5% → Phase 2 用 T=100 draft」分支**關閉**；Phase 2 draft 維持 T=1000。
+3. 確定性 sampler 的 legality 較高（0.991 vs 0.986）但 HPWL 遠差 — legalizer 修得了 overlap，修不了
+   拓撲上錯的擺放。
+Runs: `diag1B_opt_eta{00,05,10}_T{1000,100}_{a1,bb4}`、`diag1B_none_eta00_T1000_{a1,bb4}`。
 
 ### 1C log-SNR shift by V ⏳
 （填表：s=√(V/400) 與 s=√(400/V)，7 circuits，對照 0a；判定 ≥1.3 → 跑 s301/302。）

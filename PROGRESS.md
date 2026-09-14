@@ -31,6 +31,10 @@
     專案兩個標題主張（微調 −6~9%、SVDD −4.4%）都不成立 — 全是壞 baseline 48.691 的假象，加上
     paper ckpt 在我們 stack 本來就 45.99（贏已發表值 2%）。Power：排除 ≥1.5 單位的效應。**
     詳 `docs/report/sampler_report_1.md`。CoDe/TDS 推定同 null，不重跑。
+  - [x] **1B 完成**：unguided bigblue4 η=0 (DDIM) 439.2 vs η=1 269.6 = **1.63 ≥ 1.30 gate** → 確定性
+    sampler 在 size-OOD 崩潰（in-distribution 反而略好）；few-step/drifting 家族 evidential 關閉
+    （seed 301/302 已排）。有 guidance 時 η=0 bb4 −4.9% / a1 +3.4%。**T=100 bb4 +7~14%，只省 43% 時間
+    → Phase 2 不用 T=100 draft。**
 - [ ] 12.3 `docs/plan/sampler_plan_1.md` 執行中 — **In progress**
   - [x] 程式：`eta_scale` / `t_shift` sampler knobs（938e10e，39 行，defaults bit-identical）；
     best-of-N（e3ff934：`open_loop_multi` max_score bug 修正、`hpwl_pre_legalization` 永遠記錄、

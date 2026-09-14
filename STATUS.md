@@ -1,9 +1,9 @@
 # STATUS — 自動產生，不要手改
 
-由 `python3 scripts/ledger.py status` 產生於 **2026-09-14 12:37**。
-來源：`docs/ledger/runs.jsonl`（152 runs）+ `docs/ledger/results/`（逐筆 metrics.csv 存檔）。
+由 `python3 scripts/ledger.py status` 產生於 **2026-09-14 13:59**。
+來源：`docs/ledger/runs.jsonl`（163 runs）+ `docs/ledger/results/`（逐筆 metrics.csv 存檔）。
 
-環境指紋：GPU `NVIDIA GeForce RTX 5090, 32607 MiB` ・ git `9f59101`（**working tree 有未 commit 變更**）
+環境指紋：GPU `NVIDIA GeForce RTX 5090, 32607 MiB` ・ git `f5ea83f`（**working tree 有未 commit 變更**）
 
 ## Leaderboard（7-circuit avg HPWL，排除 bigblue2，越低越好）
 
@@ -60,7 +60,7 @@ avg6 = 六個便宜 circuit（bigblue4 佔 eval 時間 78%，3-seed 協定只在
 ## ⚠ 中斷的 eval（跑到一半，既不是 done 也不是 orphan）
 
 單張競爭 GPU 上被 kill / OOM / tmux 掉線的 run。
-（另有 32 個只跑 adaptec1/bigblue1 的便宜篩選 run，那是刻意的形狀，不列入。）
+（另有 37 個只跑 adaptec1/bigblue1 的便宜篩選 run，那是刻意的形狀，不列入。）
 
 - `ispd2005-s0.base_cu128_s301.301` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-14_
 - `ispd2005-s0.base_cu128_s302.302` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-14_
@@ -70,6 +70,12 @@ avg6 = 六個便宜 circuit（bigblue4 佔 eval 時間 78%，3-seed 協定只在
 - `ispd2005-s0.svdd_cu128_s302.302` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-14_
 - `ispd2005-s0.diag1A_ddpm_none.300` — 1/7 (bigblue4)　_2026-09-14_
 - `ispd2005-s0.diag1A_fm_none.300` — 1/7 (bigblue4)　_2026-09-14_
+- `ispd2005-s0.diag1B_none_eta00_T1000.300` — 1/7 (bigblue4)　_2026-09-14_
+- `ispd2005-s0.diag1B_opt_eta00_T1000.300` — 1/7 (bigblue4)　_2026-09-14_
+- `ispd2005-s0.diag1B_opt_eta00_T100.300` — 1/7 (bigblue4)　_2026-09-14_
+- `ispd2005-s0.diag1B_opt_eta05_T1000.300` — 1/7 (bigblue4)　_2026-09-14_
+- `ispd2005-s0.diag1B_opt_eta05_T100.300` — 1/7 (bigblue4)　_2026-09-14_
+- `ispd2005-s0.diag1B_opt_eta10_T100.300` — 1/7 (bigblue4)　_2026-09-14_
 
 ## ⚠ 未收割：訓練完成但從未 eval 的 checkpoint
 
