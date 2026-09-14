@@ -10,8 +10,17 @@
   但縮減步數的 smoke config 下膨脹到 ~1.8% — 不要用縮減設定做比較。
 - [ ] 12.1 Survey：flow matching 變體、drifting model、backbone 架構、DDPM 訓練改進、
   近期 placement 生成論文 → `docs/survey/method_survey_1.md` — **In progress**
-- [ ] 12.2 升級後驗證 — **In progress**：先重量 paper baseline 7 circuits seed 300
-  （`base_cu128_s300_part{1,2}`，對照舊 48.691 逐 circuit），再重跑 Run F（對照 44.321）
+- [ ] 12.2 升級後驗證 — **In progress**
+  - [x] paper baseline 7 circuits seed 300（`base_cu128_s300_part{1,2}`）= **45.987**，舊紀錄 48.691，
+    **paper 46.89** → paper 自己的 checkpoint 在我們環境現在**贏 paper 1.9%**。
+    逐 circuit：adaptec1 9.03 / adaptec2 30.75 (舊 39.06!) / adaptec3 55.98 / adaptec4 57.40 /
+    bigblue1 2.63 / bigblue3 36.59 / bigblue4 129.53。gen time 25 min（舊卡 63 min；5090 快 2.5×）。
+    判讀：舊 3 月 baseline 是壞掉的 run（目錄已被碰撞覆蓋、無法驗 config、runtime 4.5× 慢、
+    adaptec2 legality 0.93），不是 stack 漂移 — 其他舊 stack run 在同 checkpoint 上的 adaptec1
+    落在 8.8–9.4，與新值 9.03 一致。
+    **後果**：所有「−X% vs 48.691」的說法都灌水了。SVDD 44.845 vs 45.987 = Δ1.14 < 1.3（2σ）
+    → SVDD 相對 paper 方法在同環境的優勢**尚未建立**。等 Run F 判定舊 stack 數字是否可信。
+  - [ ] Run F（ablation_10k + opt, seed 300, `runF_cu128_s300_part{1,2}`）對照舊 44.321 — running
 - [ ] 12.3 依 survey 排序寫 `docs/plan/<track>_plan_1.md` 並依序執行
 - 模型分工：survey 資料蒐集 / 環境 / 執行 → Opus；分析、排序、計畫、判讀 → Fable
 
