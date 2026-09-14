@@ -26,7 +26,8 @@
     → 換 GPU/torch 等於換 random stream，是 seed 量級的變動，不是系統性偏移。
     **⚠ 同 seed 同 stack：微調 45.700 vs paper ckpt 45.987 = Δ−0.29，在雜訊帶內。** 專案標題
     「微調贏 9.6%」是對壞掉的 baseline 量的。n=1，等 seed 301/302 再下結論。
-  - [ ] 依 gate：Run F s301/302 + SVDD_layered s300/301/302 在新 stack 重跑（已插到佇列最前）
+  - [x] 0c baseline 3 seeds：avg6 **31.212 ± 0.813**（2σ = 1.63；adaptec4/bigblue3 per-circuit sd ~5.5%）
+  - [ ] 依 gate：Run F s301/302 + SVDD_layered s300/301/302 在新 stack 重跑 — running
 - [ ] 12.3 `docs/plan/sampler_plan_1.md` 執行中 — **In progress**
   - [x] 程式：`eta_scale` / `t_shift` sampler knobs（938e10e，39 行，defaults bit-identical）；
     best-of-N（e3ff934：`open_loop_multi` max_score bug 修正、`hpwl_pre_legalization` 永遠記錄、

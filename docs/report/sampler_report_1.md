@@ -10,7 +10,8 @@
 - ✅ 0b：Run F 新 stack = **45.700** vs 舊 44.321 → Δ=+1.379 ≥ 1.3，**gate 觸發：舊/新 stack 不可混比**。
   同 seed 同 stack，微調 vs paper ckpt = **Δ−0.29（雜訊帶內，n=1）**。
 - ✅ 1A：unguided FM / DDPM 在 bigblue4 = **2.45 ≥ 1.5** → FM 失敗在 objective/sampler，**維持關閉**。
-- ⏳ 0c 三 seed baseline、re-anchor（Run F ×3、SVDD ×3）、1B、1C、2a、2b。
+- ✅ 0c：baseline 3 seeds avg6 = **31.212 ± 0.813** → 同 stack 2σ bar = 1.63（預登記 1.3 維持，另報 paired t）。
+- ⏳ re-anchor（Run F ×3、SVDD ×3）、1B、1C、2a、2b、3E/3F/3H。
 
 ---
 
@@ -51,8 +52,19 @@ stream，這是 seed 量級的變動而非系統性偏移（adaptec1–4、bigbl
 **同 seed 同 stack 的微調效果 Δ = −0.29，在 1.3 雜訊帶內（n=1）。** 專案標題「微調贏 9.6%」是對
 壞掉的 baseline 量的。待 re-anchor 三 seed 配對檢定。Run: `runF_cu128_s300_part{1,2}`。
 
-### 0c baseline seeds 301 / 302 ⏳
-（6 便宜 circuit ×2 seeds；bigblue4 維持 seed 300。填表：avg6 mean ± sd，配對 Δ vs Run F / SVDD。）
+### 0c baseline seeds 300 / 301 / 302 ✅ — 同 stack 雜訊校準
+| seed | adaptec1 | adaptec2 | adaptec3 | adaptec4 | bigblue1 | bigblue3 | **avg6** |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 300 | 9.03 | 30.75 | 55.98 | 57.40 | 2.63 | 36.59 | 32.064 |
+| 301 | 9.13 | 32.08 | 52.85 | 57.35 | 2.61 | 32.76 | 31.130 |
+| 302 | 9.09 | 30.24 | 54.04 | 51.97 | 2.68 | 34.65 | 30.443 |
+| **mean ± sd** | 9.09 ± 0.05 | 31.02 ± 0.95 | 54.29 ± 1.58 | 55.57 ± 3.12 | 2.64 ± 0.03 | 34.67 ± 1.91 | **31.212 ± 0.813** |
+
+**校準**：avg6 的 across-seed sd = 0.813 → **2σ = 1.63**，比預登記的 1.3 寬（1.3 來自舊 stack SVDD 的
+avg7 σ=0.654）。預登記門檻不事後改；以下配對檢定同時報 paired t 與 |Δ| vs 1.3。
+per-circuit 雜訊：adaptec4 5.6%、bigblue3 5.5%（單 seed 的 ±8% 逐 circuit 主張 ≈ 1.5σ）；
+adaptec1 / bigblue1 < 1.5%（這兩個 circuit 的小差距反而可信）。
+bigblue4 維持 seed 300（佔 eval 時間 78%）。Runs: `base_cu128_s{300,301,302}_*`。
 
 ### re-anchor：Run F s301/302、SVDD_layered s300/301/302 ⏳
 
