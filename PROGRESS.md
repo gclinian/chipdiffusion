@@ -37,6 +37,11 @@
     → 1B η×T (12) → 1C t_shift (4) → 2a legalize-all (2) → 2b BoN 協定 (7)。skip-if-done，單一失敗不中斷。
     教訓：三個 ad-hoc waiter 用 `pgrep -f <pattern>` 等前一批，pattern 出現在自己的 cmdline 裡 →
     一個死鎖、兩個提早觸發並同時搶 GPU。**佇列一律寫成檔案、用 PID 等待。**
+  - [x] **1A unguided control 完成**（seed 300）：bigblue4 FM-none 660.84 vs DDPM-none 269.57，
+    比值 **2.45 ≥ 1.5 gate** → FM 的失敗在 objective/sampler，不是 guidance 交互；**FM 維持關閉**，
+    `flowmatch_report_1` §3.2 的說法首次有實驗支撐。pre-legalization HPWL：FM 654→1962（3×）。
+    附帶發現：DDPM 無 guidance 的 bigblue4 (269.6) ≈ FM 有 guidance (267.8) → OOD 泛化靠的是
+    DDPM **+ opt guidance**，raw model 兩者都弱。n=1；evidential 升級待 bb4 seed 301/302（排 Phase 2 後）。
 - 模型分工：survey 資料蒐集 / 環境 / 執行 → Opus；分析、排序、計畫、判讀 → Fable
 
 ## Step 10: 回歸回顧 (2026-09-06, 距上次動工 2 個月)
