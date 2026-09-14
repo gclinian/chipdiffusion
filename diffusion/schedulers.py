@@ -1,8 +1,14 @@
 import torch
 
 class CosineScheduler():
-    def __init__(self, clip = False):
+    def __init__(self, clip = False, eta_scale = 1.0, t_shift = 1.0):
         self.clip = clip
+        # eta_scale: DDIM stochasticity dial (Song et al. 2021). 1.0 = full DDPM posterior noise (default,
+        # unchanged); 0.0 = deterministic DDIM. Anything in between interpolates.
+        self.eta_scale = eta_scale
+        # t_shift: SD3 / simple-diffusion timestep-grid shift (Esser et al. 2024, Hoogeboom et al. 2023).
+        # s > 1 moves grid points toward high noise, which inputs larger than training resolution need.
+        self.t_shift = t_shift
 
     def add_noise(self, input, eps, t):
         # takes:
@@ -19,7 +25,11 @@ class CosineScheduler():
     
     def set_timesteps(self, num_timesteps):
         self.num_timesteps = num_timesteps
-        self.timesteps = torch.linspace(1-1e-4, 1e-4, num_timesteps+1)
+        timesteps = torch.linspace(1-1e-4, 1e-4, num_timesteps+1)
+        s = self.t_shift
+        if s != 1.0: # monotone warp t' = s t / (1 + (s-1) t); s = 1 is the identity, grid order preserved
+            timesteps = s * timesteps / (1 + (s - 1) * timesteps)
+        self.timesteps = timesteps
 
     def step(
             self, 
@@ -65,7 +75,7 @@ class CosineScheduler():
     def eta(self, t, t_minus_one):
         a = self.sigma(t_minus_one) / self.sigma(t)
         b = torch.sqrt(1-torch.square(self.alpha(t)/self.alpha(t_minus_one)))
-        return a * b
+        return a * b * self.eta_scale # eta_scale = 1 -> DDPM posterior (default), 0 -> deterministic DDIM
 
     def alpha(self, t):
         return torch.cos((torch.pi/2)*t)

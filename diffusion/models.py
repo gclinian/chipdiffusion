@@ -1375,6 +1375,16 @@ class ContinuousDiffusionModel(nn.Module):
         self.tds_ess_threshold_frac = kwargs.get("tds_ess_threshold_frac", 0.5)
         self.tds_layer_opt = kwargs.get("tds_layer_opt", False)
 
+        # Sampler knobs (defaults reproduce previous behaviour exactly)
+        # eta_scale: DDIM stochasticity dial, 1.0 = DDPM posterior noise, 0.0 = deterministic DDIM
+        self._noise_scheduler.eta_scale = float(kwargs.get("eta_scale", 1.0))
+        # t_shift: SD3 / simple-diffusion timestep shift, for inputs larger than those seen in training
+        self.t_shift = float(kwargs.get("t_shift", 1.0))
+        self.t_shift_by_size = bool(kwargs.get("t_shift_by_size", False))  # derive s from node count V
+        self.t_shift_ref_size = float(kwargs.get("t_shift_ref_size", 400))  # V of a typical training graph
+        self.t_shift_invert = bool(kwargs.get("t_shift_invert", False))  # s = sqrt(ref/V) instead of sqrt(V/ref)
+        self._noise_scheduler.t_shift = self.t_shift
+
     def __call__(self, x, cond, t):
         # input: x is (B, V, F) for graphs, t is (B), cond is Data obj
         # note: 1 graph at a time
@@ -1449,6 +1459,17 @@ class ContinuousDiffusionModel(nn.Module):
         
         return intermediates
 
+    def _set_t_shift(self, cond):
+        # set the scheduler's SD3-style timestep shift s before set_timesteps; s = 1 is the default no-op
+        s = self.t_shift
+        if self.t_shift_by_size:
+            V = cond.x.shape[0]
+            s = (self.t_shift_ref_size / V) ** 0.5 if self.t_shift_invert else (V / self.t_shift_ref_size) ** 0.5
+            print(f"t_shift: V={V}, ref={self.t_shift_ref_size:.0f}, effective s={s:.4f}")
+        elif s != 1.0:
+            print(f"t_shift: effective s={s:.4f}")
+        self._noise_scheduler.t_shift = s
+
     def reverse_samples(self, B, x_in, cond, num_timesteps=-1, intermediate_every = 0, mask_override = None, output_log_prob = False):
         # B: batch size
         # intermediate_every: determines how often intermediate diffusion steps are saved and returned. 0 = no intermediates returned
@@ -1471,6 +1492,7 @@ class ContinuousDiffusionModel(nn.Module):
         x = torch.where(mask, x_in, x) if mask is not None else x
 
         intermediates = [x]
+        self._set_t_shift(cond)
         self._noise_scheduler.set_timesteps(num_timesteps)
         timesteps = self._noise_scheduler.timesteps
 
@@ -1559,6 +1581,7 @@ class ContinuousDiffusionModel(nn.Module):
         x = torch.where(mask, x_in, x) if mask is not None else x
 
         intermediates = [x]
+        self._set_t_shift(cond)
         self._noise_scheduler.set_timesteps(num_timesteps)
         timesteps = self._noise_scheduler.timesteps
 
@@ -1668,6 +1691,7 @@ class ContinuousDiffusionModel(nn.Module):
         x = torch.where(mask, x_in, x) if mask is not None else x
 
         intermediates = [x]
+        self._set_t_shift(cond)
         self._noise_scheduler.set_timesteps(num_timesteps)
         timesteps = self._noise_scheduler.timesteps
 
@@ -1773,6 +1797,7 @@ class ContinuousDiffusionModel(nn.Module):
         x = torch.where(mask, x_in_n, x) if mask is not None else x
 
         intermediates = [x[:1]]
+        self._set_t_shift(cond)
         self._noise_scheduler.set_timesteps(num_timesteps)
         timesteps = self._noise_scheduler.timesteps
 
@@ -2131,6 +2156,7 @@ def pi_log_prob(x_t_minus, mu, sigma):
     # sigma: float
     # output: tensor(B) with gradients
     dims = list(range(1, len(mu.shape)))
+    sigma = torch.clamp(sigma, min=1e-8) if torch.is_tensor(sigma) else max(sigma, 1e-8) # eta_scale=0 -> degenerate
     return -0.5 * torch.mean(torch.square((x_t_minus.detach() - mu)), dim=dims)/(sigma**2)
 
 def get_linear_sched(T, beta_1, beta_T):
