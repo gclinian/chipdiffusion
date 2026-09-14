@@ -37,6 +37,12 @@
     → Phase 2 不用 T=100 draft。**
   - [x] **1C 完成**：t-shift up avg7 51.71（+5.72，bb4 +35%）、inv 45.66（−0.33）→ 兩方向關閉；
     符號與 SD3 影像直覺相反（往低噪聲對大 circuit 略好但重傷小 circuit）。
+  - [x] **2a 完成**：pre-leg vs post-leg 候選排序 ρ=+0.40（a1 與 bb4 皆然，argmin 都不同）→ 便宜 draft
+    選擇死亡；全 legalize 的 best-of-4 在 bigblue4 **−6.2%**（121.53 vs 129.53，n=1）。
+  - [x] **2b 作廢（我的預登記錯誤）**：legality floor 0.97 是 post-leg 門檻，套在 pre-leg 值（0.80–0.95）上
+    永遠過不了 → 每列都 fallback 到「取最高 legality」，**從未以 HPWL 選**。policies.py 已加 warning +
+    純 HPWL fallback。
+  - [ ] **2c 修正協定**：`+num_candidates=4 +legalize_all_candidates=true`，6 circuit × 3 seeds — queued
 - [ ] 12.3 `docs/plan/sampler_plan_1.md` 執行中 — **In progress**
   - [x] 程式：`eta_scale` / `t_shift` sampler knobs（938e10e，39 行，defaults bit-identical）；
     best-of-N（e3ff934：`open_loop_multi` max_score bug 修正、`hpwl_pre_legalization` 永遠記錄、

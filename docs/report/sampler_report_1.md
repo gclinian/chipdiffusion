@@ -14,7 +14,9 @@
 - ✅ re-anchor：**微調 Δ=+0.002、SVDD Δ=−0.175（paired, n=3）— 兩個標題主張都是壞 baseline 的假象。**
 - ✅ 1B：unguided bigblue4 η=0/η=1 = **1.63 ≥ 1.30** → 確定性 sampler 在 OOD 崩潰，few-step 家族關閉；T=100 +7~14% → 不用 draft。
 - ✅ 1C：t-shift 兩方向皆未達 −1.3（up +5.72 因 bb4 +35%；inv −0.33）→ 關閉；符號與影像直覺相反。
-- ⏳ **2a/2b（現在最關鍵）**、3E/3F/3H、1A/1B evidential seeds。
+- ✅ 2a：ρ=+0.40 兩 circuit → pre-leg 選候選**不可行**；bigblue4 best-of-4（全 legalize）**−6.2%**（n=1）。
+- ❌ 2b：無效 — floor 套錯（pre-leg 值 0.80–0.95 永遠過不了 0.97）→ 從未以 HPWL 選。我的設計錯誤。
+- ⏳ **2c 修正協定（全 legalize，6 circuit × 3 seeds）**、3E/3F/3H、1A/1B evidential seeds。
 
 ---
 
@@ -159,11 +161,31 @@ Runs: `diag1B_opt_eta{00,05,10}_T{1000,100}_{a1,bb4}`、`diag1B_none_eta00_T1000
 
 ---
 
-## Phase 2 — Best-of-N ⏳
-### 2a rank-correlation（legalize all 4，adaptec1 + bigblue4）
-（填：pre-leg vs post-leg 排序的 Spearman ρ；ρ ≥ 0.7 → draft 可用 pre-leg 分數。）
-### 2b 協定 run（N=4，6 circuit × 3 seeds + bb4 × 1）
-（填：best-of-4 mean ± sd，legality floor 0.97 下的通過率；對照 0c 三 seed baseline。）
+## Phase 2 — Best-of-N
+### 2a rank-correlation（4 個候選全部 legalize，seed 300）✅ — gate **失敗**，便宜 draft 選擇死亡
+| circuit | pre-leg HPWL（4 候選）| post-leg HPWL | Spearman ρ | argmin pre / post | 最終（best-of-4）| vs 0a |
+|---|---|---|---:|---|---:|---:|
+| adaptec1 | 7.35, 7.36, 7.69, 7.48 | 9.15, 9.24, 9.92, 9.14 | **+0.40** | 0 / 3 ≠ | 9.14 | +1.2% |
+| bigblue4 | 81.5, 82.5, 79.3, 79.4 | 121.5, 131.7, 125.7, 131.0 | **+0.40** | 2 / 0 ≠ | **121.53** | **−6.2%** |
+
+**預登記判定**（ρ ≥ 0.7 兩者皆須）：兩個 circuit 都只有 +0.40，且 pre-leg 的最佳候選在兩個 circuit 上都
+**不是** post-leg 的最佳 → **pre-legalization HPWL 不能用來選候選**；任何 best-of-N 都必須把每個候選
+legalize（N× legalization 成本）。survey §4.2 的 draft-and-refine 想法**關閉**。
+附帶：這兩個 cell 本身就是有效的 best-of-4（全 legalize、以 post-leg HPWL 選）：bigblue4 −6.2%（n=1，
+bb4 σ~3–4% → ~1.8σ），adaptec1 +1.2%（σ 0.5% 的 circuit 沒東西可撿）。4 個 legalized 候選在 bigblue4 的
+範圍 121.5–131.7（8%）— 單 seed 內的候選變異**大於** across-seed 變異，這就是 best-of-N 要撿的東西。
+
+### 2b 協定 run（N=4，pre-leg 選擇，floor 0.97）✅ — **無效（計畫設計錯誤）**
+paired Δavg6 = +0.632 ± 2.371（t=0.46，n=3）— 但這個數字不能用：
+**legality floor 0.97 是 post-legalization 的門檻，我把它套在 pre-legalization 值上。** 實際 pre-leg legality
+在所有 circuit 都是 0.80–0.95（overlap 正是 legalization 要修的東西），所以 0/4 候選過門檻，每一列都落入
+fallback「取 legality 最高者」— **從頭到尾沒有用 HPWL 選過**（7 個 circuit 裡 6 個 chosen ≠ argmin HPWL）。
+這是我的預登記錯誤，不是程式錯誤；程式已補一個 loud warning + 純 HPWL fallback，避免再靜默發生。
+Runs: `bon2a_legall_{a1,bb4}`、`bon2b_s{300,301,302}_*`（後者作廢）。
+
+### 2c 修正協定（N=4，**全部 legalize**，post-leg HPWL 選，floor 0.97 on post-leg）⏳
+6 便宜 circuit × seeds 300/301/302；bigblue4 用 2a 的 seed 300 cell。對照 0c 三 seed baseline（配對）。
+判定：paired Δavg6 ≤ −1.3 且 t 顯著 → 可報告的協定；否則 best-of-4 增益在雜訊帶內。
 
 ---
 

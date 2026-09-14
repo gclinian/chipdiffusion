@@ -224,8 +224,16 @@ def open_loop_best_of_n(
     passing = [i for i in range(num_candidates) if legalities[i] >= legality_floor]
     if passing:
         best = min(passing, key = lambda i: hpwls[i])
-    else:
+    elif legalize_all:
         best = max(range(num_candidates), key = lambda i: (legalities[i], -hpwls[i]))
+    else:
+        # Pre-legalization legality is typically 0.8-0.95 (overlaps are what legalization
+        # removes), so a post-legalization floor is unreachable here. Selecting by legality
+        # in that case silently ignores HPWL (this happened: sampler_report_1 Phase 2b).
+        # Fall back to pure min-HPWL and say so loudly.
+        print(f"  WARNING: no candidate clears legality floor {legality_floor} BEFORE legalization "
+              f"(max {max(legalities):.3f}); selecting by pre-legalization HPWL alone", flush = True)
+        best = min(range(num_candidates), key = lambda i: hpwls[i])
     print(f"  chose candidate {best+1}/{num_candidates} ({len(passing)} cleared legality floor {legality_floor})", flush = True)
 
     metrics = {
