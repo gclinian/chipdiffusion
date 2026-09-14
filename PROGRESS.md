@@ -22,7 +22,14 @@
     **後果**：所有「−X% vs 48.691」的說法都灌水了。SVDD 44.845 vs 45.987 = Δ1.14 < 1.3（2σ）
     → SVDD 相對 paper 方法在同環境的優勢**尚未建立**。等 Run F 判定舊 stack 數字是否可信。
   - [ ] Run F（ablation_10k + opt, seed 300, `runF_cu128_s300_part{1,2}`）對照舊 44.321 — running
-- [ ] 12.3 `docs/plan/sampler_plan_1.md` 已寫（Phase 0 重錨 → 1 三診斷 → 2 Best-of-N，全 eval-only ~6 GPU-h）— **In progress**
+- [ ] 12.3 `docs/plan/sampler_plan_1.md` 執行中 — **In progress**
+  - [x] 程式：`eta_scale` / `t_shift` sampler knobs（938e10e，39 行，defaults bit-identical）；
+    best-of-N（e3ff934：`open_loop_multi` max_score bug 修正、`hpwl_pre_legalization` 永遠記錄、
+    `+num_candidates=N +candidate_legality_floor=0.97 [+legalize_all_candidates=true]`）。
+    兩者由 Opus 在 worktree 實作、CPU 測試、Fable review 後合併。
+  - [ ] GPU 佇列（序列，自動接續）：Run F part2 → 1A unguided control (4) → 0c baseline s301/302 (4)
+    → 1B η×T (12) → 1C t_shift up/inv (4) → 2a legalize-all rank-corr (2) → 2b BoN 協定 (7)。
+    所有 run 自動進 ledger；每個 cell 獨立，單一失敗不中斷佇列。
 - 模型分工：survey 資料蒐集 / 環境 / 執行 → Opus；分析、排序、計畫、判讀 → Fable
 
 ## Step 10: 回歸回顧 (2026-09-06, 距上次動工 2 個月)
