@@ -96,3 +96,15 @@ bigblue4 佔 eval 時間 78%。**3 seeds 跑 6 個便宜 circuit + bigblue4 只�
 ## 6. 明確不做（本輪）
 Drifting model、MeanFlow/Shortcut/sCM/IMM/CTM、ODE→SDE on FM、Graph Transformer backbone（壞的）、
 conv-layer swap（丟 pin offset）、AddLoss 任何變體、DDPO 任何變體。理由見 survey §6。
+
+## Phase 4 — 收尾 seeds（2026-09-15 追加，預登記，使用者核准）
+GPU 閒置；序列 ~3 h。全部 eval-only。
+### 4X Run X（from-scratch 500k）seeds 301/302，6 便宜 circuit
+- 對照 0c baseline 同 seeds（配對）。**判定**：paired Δavg6（n=3）≤ −1.3 且三個 seed 同號 → 專案第一個
+  在乾淨 stack 上成立的正向方法結果；−1.3 < Δ ≤ −0.8 → 補 seeds 303–305；否則記錄為 n=1 假警報。
+### 4C DataAug Run C eval，7 circuits，seed 300
+- 對照 Run X 同 stack（44.649, n=1）。**判定**：avg7 ≤ 43.35（−1.3）→ 補 seeds；否則關閉
+  （dataaug_plan_1 §4 的規則搬到同 stack 比較）。
+### 4B best-of-4（全 legalize）+ baseline，seeds 303/304/305，6 便宜 circuit
+- 與 2c 合併成 n=6 配對。**判定**：mean Δavg6 ≤ −1.0 且 95% CI（t, df=5）不含 0 → 可報告的協定
+  （報 effect ± CI、成本 4×、legality floor 0.97）；mean ≤ −1.3 → strong；否則關閉。

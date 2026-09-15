@@ -50,7 +50,8 @@
   - ⚑ **Run X（from-scratch 500k）同 stack avg7 44.649 — 本輪最佳，比 paper ckpt 好 1.34（n=1）。未預登記。**
 - [x] 12.3 `docs/plan/sampler_plan_1.md` **全部執行完畢**（2026-09-15 04:04，43 cells，零失敗）→
   `docs/report/sampler_report_1.md`、`docs/next/sampler_next_1.md`。
-- [ ] 12.4 待使用者決定：Run X seeds 301/302（~25 min）、best-of-4 seeds 303–305（~1.5 h）、DataAug Run C eval
+- [ ] 12.4 **In progress**（使用者核准 09-15）：`scripts/run_phase4_seeds.sh` — Run X s301/302 → Run C 7 circ →
+  baseline + best-of-4 s303–305。預登記判定見 plan Phase 4。
   - [x] 程式：`eta_scale` / `t_shift` sampler knobs（938e10e，39 行，defaults bit-identical）；
     best-of-N（e3ff934：`open_loop_multi` max_score bug 修正、`hpwl_pre_legalization` 永遠記錄、
     `+num_candidates=N +candidate_legality_floor=0.97 [+legalize_all_candidates=true]`）。
