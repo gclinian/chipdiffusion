@@ -42,8 +42,15 @@
   - [x] **2b 作廢（我的預登記錯誤）**：legality floor 0.97 是 post-leg 門檻，套在 pre-leg 值（0.80–0.95）上
     永遠過不了 → 每列都 fallback 到「取最高 legality」，**從未以 HPWL 選**。policies.py 已加 warning +
     純 HPWL fallback。
-  - [ ] **2c 修正協定**：`+num_candidates=4 +legalize_all_candidates=true`，6 circuit × 3 seeds — queued
-- [ ] 12.3 `docs/plan/sampler_plan_1.md` 執行中 — **In progress**
+  - [x] **2c 完成**：best-of-4 全 legalize，paired Δavg6 **−1.02 ± 1.22 (t=−1.44, n=3)** → 未達 −1.3；
+    方向對、power 不足（需 n≈6）。bb4 −6.2%（n=1）。
+  - [x] **3E 關閉**（deep-K 最佳 −2.3% n=1；K=150 +7~15%）；**3F 關閉**（post-hoc 平均兩 window 皆更差）；
+    **3H 關閉**（frame averaging −0.4% / +2.4%）。
+  - [x] **1A / 1B evidential (n=3)**：FM/DDPM 2.22 ± 0.20；η=0/η=1 1.61 ± 0.02。
+  - ⚑ **Run X（from-scratch 500k）同 stack avg7 44.649 — 本輪最佳，比 paper ckpt 好 1.34（n=1）。未預登記。**
+- [x] 12.3 `docs/plan/sampler_plan_1.md` **全部執行完畢**（2026-09-15 04:04，43 cells，零失敗）→
+  `docs/report/sampler_report_1.md`、`docs/next/sampler_next_1.md`。
+- [ ] 12.4 待使用者決定：Run X seeds 301/302（~25 min）、best-of-4 seeds 303–305（~1.5 h）、DataAug Run C eval
   - [x] 程式：`eta_scale` / `t_shift` sampler knobs（938e10e，39 行，defaults bit-identical）；
     best-of-N（e3ff934：`open_loop_multi` max_score bug 修正、`hpwl_pre_legalization` 永遠記錄、
     `+num_candidates=N +candidate_legality_floor=0.97 [+legalize_all_candidates=true]`）。

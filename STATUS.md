@@ -1,9 +1,9 @@
 # STATUS — 自動產生，不要手改
 
-由 `python3 scripts/ledger.py status` 產生於 **2026-09-14 17:49**。
-來源：`docs/ledger/runs.jsonl`（175 runs）+ `docs/ledger/results/`（逐筆 metrics.csv 存檔）。
+由 `python3 scripts/ledger.py status` 產生於 **2026-09-15 10:19**。
+來源：`docs/ledger/runs.jsonl`（200 runs）+ `docs/ledger/results/`（逐筆 metrics.csv 存檔）。
 
-環境指紋：GPU `NVIDIA GeForce RTX 5090, 32607 MiB` ・ git `91b85ad`（**working tree 有未 commit 變更**）
+環境指紋：GPU `NVIDIA GeForce RTX 5090, 32607 MiB` ・ git `5b22680`（**working tree 有未 commit 變更**）
 
 ## Leaderboard（7-circuit avg HPWL，排除 bigblue2，越低越好）
 
@@ -17,15 +17,21 @@ avg6 = 六個便宜 circuit（bigblue4 佔 eval 時間 78%，3-seed 協定只在
 
 | avg7 | avg6 | circuits | run group | seed | checkpoint |
 |-----:|-----:|---------:|-----------|------|------------|
+| — | 29.646 | 6 | `ispd2005-s0.bon2c_s301.301` | 301 | `large-v2 (paper)` |
 | 44.817 | 30.090 | 7 | `ispd2005-s0.bon2b_s300.300` | 300 | `large-v2 (paper)` |
+| — | 30.124 | 6 | `ispd2005-s0.bon2c_s300.300` | 300 | `large-v2 (paper)` |
 | — | 30.443 | 6 | `ispd2005-s0.base_cu128_s302.302` | 302 | `large-v2 (paper)` |
 | — | 30.473 | 6 | `ispd2005-s0.svdd_cu128_s302.302` | 302 | `large-v2 (paper)` |
 | 44.166 | 30.521 | 7 | `ispd2005-s0.svdd_cu128_s300.300` | 300 | `large-v2 (paper)` |
+| — | 30.810 | 6 | `ispd2005-s0.bon2c_s302.302` | 302 | `large-v2 (paper)` |
+| 44.649 | 31.094 | 7 | `ispd2005-s0.runX_cu128_s300.300` | 300 | `v1.61-fs.61.fs_p1_X_500k.61/latest.ckpt` |
 | — | 31.130 | 6 | `ispd2005-s0.base_cu128_s301.301` | 301 | `large-v2 (paper)` |
 | — | 31.131 | 6 | `ispd2005-s0.runF_cu128_s302.302` | 302 | `v1.61-ddpo.ablation_supervised_10k.61/latest.ckpt` |
 | 51.705 | 31.143 | 7 | `ispd2005-s0.diag1C_tshift_up.300` | 300 | `large-v2 (paper)` |
 | 45.700 | 31.184 | 7 | `ispd2005-s0.runF_cu128_s300.300` | 300 | `v1.61-ddpo.ablation_supervised_10k.61/latest.ckpt` |
 | — | 31.327 | 6 | `ispd2005-s0.runF_cu128_s301.301` | 301 | `v1.61-ddpo.ablation_supervised_10k.61/latest.ckpt` |
+| 45.569 | 31.607 | 7 | `ispd2005-s0.runXavg_400k_500k.300` | 300 | `v1.61-fs.61.fs_p1_X_500k.61/avg_400k_500k_uniform.ckpt` |
+| 46.497 | 31.612 | 7 | `ispd2005-s0.runXavg_250k_500k.300` | 300 | `v1.61-fs.61.fs_p1_X_500k.61/avg_250k_500k_uniform.ckpt` |
 | — | 31.650 | 6 | `ispd2005-s0.bon2b_s302.302` | 302 | `large-v2 (paper)` |
 | 45.987 | 32.064 | 7 | `ispd2005-s0.base_cu128_s300.300` | 300 | `large-v2 (paper)` |
 | — | 32.117 | 6 | `ispd2005-s0.svdd_cu128_s301.301` | 301 | `large-v2 (paper)` |
@@ -65,25 +71,39 @@ avg6 = 六個便宜 circuit（bigblue4 佔 eval 時間 78%，3-seed 協定只在
 ## ⚠ 中斷的 eval（跑到一半，既不是 done 也不是 orphan）
 
 單張競爭 GPU 上被 kill / OOM / tmux 掉線的 run。
-（另有 37 個只跑 adaptec1/bigblue1 的便宜篩選 run，那是刻意的形狀，不列入。）
+（另有 39 個只跑 adaptec1/bigblue1 的便宜篩選 run，那是刻意的形狀，不列入。）
 
 - `ispd2005-s0.base_cu128_s301.301` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-14_
 - `ispd2005-s0.base_cu128_s302.302` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-14_
 - `ispd2005-s0.bon2b_s301.301` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-14_
 - `ispd2005-s0.bon2b_s302.302` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-14_
+- `ispd2005-s0.bon2c_s300.300` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-15_
+- `ispd2005-s0.bon2c_s301.301` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-15_
+- `ispd2005-s0.bon2c_s302.302` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-15_
 - `ispd2005-s0.runF_cu128_s301.301` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-14_
 - `ispd2005-s0.runF_cu128_s302.302` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-14_
 - `ispd2005-s0.svdd_cu128_s301.301` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-14_
 - `ispd2005-s0.svdd_cu128_s302.302` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-14_
 - `ispd2005-s0.bon2a_legall.300` — 1/7 (bigblue4)　_2026-09-14_
+- `ispd2005-s0.deepK150_acf05.300` — 1/7 (bigblue4)　_2026-09-14_
+- `ispd2005-s0.deepK150_acf10.300` — 1/7 (bigblue4)　_2026-09-14_
+- `ispd2005-s0.deepK60_acf05.300` — 1/7 (bigblue4)　_2026-09-14_
+- `ispd2005-s0.deepK60_acf10.300` — 1/7 (bigblue4)　_2026-09-14_
 - `ispd2005-s0.diag1A_ddpm_none.300` — 1/7 (bigblue4)　_2026-09-14_
+- `ispd2005-s0.diag1A_ddpm_none_bb4_s301.301` — 1/7 (bigblue4)　_2026-09-14_
+- `ispd2005-s0.diag1A_ddpm_none_bb4_s302.302` — 1/7 (bigblue4)　_2026-09-14_
 - `ispd2005-s0.diag1A_fm_none.300` — 1/7 (bigblue4)　_2026-09-14_
+- `ispd2005-s0.diag1A_fm_none_bb4_s301.301` — 1/7 (bigblue4)　_2026-09-14_
+- `ispd2005-s0.diag1A_fm_none_bb4_s302.302` — 1/7 (bigblue4)　_2026-09-14_
 - `ispd2005-s0.diag1B_none_eta00_T1000.300` — 1/7 (bigblue4)　_2026-09-14_
+- `ispd2005-s0.diag1B_none_eta00_T1000_bb4_s301.301` — 1/7 (bigblue4)　_2026-09-15_
+- `ispd2005-s0.diag1B_none_eta00_T1000_bb4_s302.302` — 1/7 (bigblue4)　_2026-09-15_
 - `ispd2005-s0.diag1B_opt_eta00_T1000.300` — 1/7 (bigblue4)　_2026-09-14_
 - `ispd2005-s0.diag1B_opt_eta00_T100.300` — 1/7 (bigblue4)　_2026-09-14_
 - `ispd2005-s0.diag1B_opt_eta05_T1000.300` — 1/7 (bigblue4)　_2026-09-14_
 - `ispd2005-s0.diag1B_opt_eta05_T100.300` — 1/7 (bigblue4)　_2026-09-14_
 - `ispd2005-s0.diag1B_opt_eta10_T100.300` — 1/7 (bigblue4)　_2026-09-14_
+- `ispd2005-s0.frameavg.300` — 1/7 (bigblue4)　_2026-09-15_
 
 ## ⚠ 未收割：訓練完成但從未 eval 的 checkpoint
 

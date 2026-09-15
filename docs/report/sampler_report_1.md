@@ -1,4 +1,4 @@
-# Sampler 診斷與 Best-of-N 報告（sampler_report_1）— 2026-09-14（進行中）
+# Sampler 診斷與 Best-of-N 報告（sampler_report_1）— 2026-09-14/15（完成）
 
 > 對應計畫：`docs/plan/sampler_plan_1.md`。每一節對照該 phase **預登記的判定標準**。
 > 環境：`chipdiff-b`（torch 2.11.0+cu128, RTX 5090 32.6 GB）。所有數字 7-circuit avg HPWL ×10⁵，
@@ -16,7 +16,11 @@
 - ✅ 1C：t-shift 兩方向皆未達 −1.3（up +5.72 因 bb4 +35%；inv −0.33）→ 關閉；符號與影像直覺相反。
 - ✅ 2a：ρ=+0.40 兩 circuit → pre-leg 選候選**不可行**；bigblue4 best-of-4（全 legalize）**−6.2%**（n=1）。
 - ❌ 2b：無效 — floor 套錯（pre-leg 值 0.80–0.95 永遠過不了 0.97）→ 從未以 HPWL 選。我的設計錯誤。
-- ⏳ **2c 修正協定（全 legalize，6 circuit × 3 seeds）**、3E/3F/3H、1A/1B evidential seeds。
+- ⚖ 2c：best-of-4（全 legalize）paired Δavg6 **−1.02 ± 1.22（t=−1.44）** → 未達 −1.3；方向對、power 不足（要 n≈6）。
+- ❌ 3E deep-K：最佳 −2.3%（n=1），K=150 +7~15% → 關閉。 ❌ 3F post-hoc 平均：兩 window 都更差 → 關閉。
+  ❌ 3H frame averaging：a1 −0.4% / bb4 +2.4% → 關閉。
+- ✅ 1A / 1B evidential（n=3）：FM/DDPM 2.22 ± 0.20；η=0/η=1 1.61 ± 0.02。
+- ⚑ **意外發現：Run X（from-scratch 500k）同 stack avg7 44.649，本輪最佳，比 paper ckpt 好 1.34（n=1）。**
 
 ---
 
@@ -184,9 +188,79 @@ fallback「取 legality 最高者」— **從頭到尾沒有用 HPWL 選過**（
 為完整記錄（**不可用**）：bon2b avg6 = 30.090 (s300, avg7 44.817) / 33.794 (s301) / 31.650 (s302)。
 Runs: `bon2a_legall_{a1,bb4}`、`bon2b_s300`、`bon2b_s301`、`bon2b_s302`（後三者作廢）。
 
-### 2c 修正協定（N=4，**全部 legalize**，post-leg HPWL 選，floor 0.97 on post-leg）⏳
-6 便宜 circuit × seeds 300/301/302；bigblue4 用 2a 的 seed 300 cell。對照 0c 三 seed baseline（配對）。
-判定：paired Δavg6 ≤ −1.3 且 t 顯著 → 可報告的協定；否則 best-of-4 增益在雜訊帶內。
+### 2c 修正協定（N=4，**全部 legalize**，post-leg HPWL 選）✅ — **方向正確、n=3 power 不足**
+| seed | baseline avg6 | best-of-4 avg6 | Δ | 逐 circuit Δ |
+|---|---:|---:|---:|---|
+| 300 | 32.064 | 30.124 | **−1.939** | a1 +1%, a2 −1%, a3 −4%, a4 −7%, bb1 0%, bb3 **−14%** |
+| 301 | 31.130 | 29.646 | **−1.484** | a1 +1%, a2 **−13%**, a3 0%, a4 −8%, bb1 +1%, bb3 0% |
+| 302 | 30.443 | 30.810 | +0.367 | a1 −1%, a2 −6%, a3 −3%, a4 +7%, bb1 −4%, bb3 +7% |
+| **paired** | | | **−1.019 ± 1.222（t = −1.44, n=3）** | bigblue4（seed 300，2a cell）**−6.2%** |
+
+3.67/4 候選過 post-leg legality floor 0.97 → 機制如設計運作。chosen idx 分佈 [6,2,3,7]（不是永遠選第一個）。
+**預登記判定**（Δavg6 ≤ −1.3 且 t 顯著）：mean −1.02 未達 −1.3，t=−1.44（df=2，p≈0.29）→ **未確立**。
+但誠實的補充：這是整輪在乾淨 stack 上**唯一**點估計方向與預期一致（min-of-4 ≈ mean − 1σ）、且幅度
+最大的方法（−3.3%）；sd 1.22 意味著要 n≈6–8 才能在 2σ 解析 1.0 的效應。增益集中在高 σ circuit
+（bb3 −14%、a2 −13%、a4 −7%）— 正是 noise harvesting，須報 legality floor（已報）與成本（4× sampling
++ 4× legalization ≈ 每 seed 31 min vs 14 min）。**不關閉、不宣稱；補 seeds 303–305 可解析（~1.5 h）。**
+Runs: `bon2c_s{300,301,302}_*`。
+
+---
+
+## Phase 3 — Skeptic 存活的三個零訓練測試（seed 300）
+
+### 3E deep guidance K（MacroDiff+ 式）✅ — **關閉**
+| cell | bigblue4 | Δ | legality | gen s（×0a）|
+|---|---:|---:|---:|---:|
+| K=20 acf=0.5（0a）| 129.53 | — | 0.990 | 1013 |
+| K=60 acf=0.5 | 126.55 | −2.3% | 0.990 | 2434（2.4×）|
+| K=60 acf=1.0 | 133.67 | +3.2% | 0.991 | 2855（2.8×）|
+| K=150 acf=0.5 | 138.04 | +6.6% | 0.991 | 5483（5.4×）|
+| K=150 acf=1.0 | 140.10 | +8.2% | 0.989 | 5636（5.6×）|
+| adaptec1 K=150 acf=0.5 | 10.40 | **+15.2%** | 0.993 | 896（9.6×）|
+
+**預登記判定**（任一 bb4 cell ≥ 5% 且 legality ≥ 0.98）：最好的只有 −2.3%（n=1，< bb4 σ）→ **關閉**。
+更多 inner step = over-guidance，與 1B 的 T curve、FM 報告 §3.1 同型；skeptic 的 hidden cost（α dual
+ascent 在 K 迴圈內提早飽和）成立。MacroDiff+ 的 in-distribution 增益不轉移到 zero-shot 設定。
+Runs: `deepK{60,150}_acf{05,10}_bb4`、`deepK150_acf05_a1`。
+
+### 3F post-hoc 權重平均（EMA 零訓練代理）✅ — **關閉配方方向**
+| checkpoint | avg7 | Δ vs Run X（同 stack）|
+|---|---:|---:|
+| Run X 500k latest（同 stack 重量）| **44.649** | —（舊 stack 紀錄 45.053）|
+| avg 250k–500k uniform | 46.497 | +1.85 |
+| avg 400k–500k uniform | 45.569 | +0.92 |
+
+**預登記判定**（≤ −1.3 → 真 EMA 訓練值得）：兩個 window 都**更差** → **關閉**。與建 ckpt 的 agent 警告一致：
+500k 時模型仍在移動（相鄰 snapshot 相距 rel-L2 0.18–0.25），平均落在 basin 外。
+**附帶但重要**：Run X（from-scratch，合成資料，1/6 paper 步數）在新 stack 上 **44.649，是本輪最佳 avg7**，
+比 paper ckpt 45.987 好 1.34（n=1，剛好在 bar 上）。逐 circuit：
+| | adaptec1 | adaptec2 | adaptec3 | adaptec4 | bigblue1 | bigblue3 | bigblue4 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Run X | 9.41 | 28.77 | 59.62 | 50.58 | 2.67 | 35.52 | 125.98 |
+| paper ckpt | 9.03 | 30.75 | 55.98 | 57.40 | 2.63 | 36.59 | 129.53 |
+| Δ | +4% | -6% | +6% | -12% | +2% | -3% | -3% |
+
+**未被本輪任何預登記判定涵蓋；建議補 seeds 301/302（6 circuit，~25 min）。**
+Runs: `runX_cu128_s300_part{1,2}`、`runXavg_{250k_500k,400k_500k}_part{1,2}`。
+
+### 3H frame averaging（D4 exact test-time symmetrization）✅ — **關閉**
+| | adaptec1 | Δ | bigblue4 | Δ | gen s |
+|---|---:|---:|---:|---:|---:|
+| 0a | 9.03 | — | 129.53 | — | 93 / 1013 |
+| frame_average | 9.00 | −0.4% | 132.65 | +2.4% | 258（2.8×）/ 1182（1.2×）|
+
+**預登記判定**（bb4 ≥ 5% 或 a1 ≥ 3%）：皆未達 → **關閉**。精確 D4 等變性不改善結果 — model 的
+非等變性不是限制因素（訓練端 D4 augmentation 的 Run C 仍未 eval，但這個結果讓它的優先度更低）。
+Runs: `frameavg_{a1,bb4}`。
+
+### 1A / 1B evidential 升級（bigblue4，seeds 300/301/302）✅
+| gate | seed 300 | 301 | 302 | mean ± sd | 判定 |
+|---|---:|---:|---:|---:|---|
+| 1A FM-none / DDPM-none | 2.45 | 2.16 | 2.06 | **2.22 ± 0.20** | ≥ 1.5 → **確認（n=3）** |
+| 1B η=0 / η=1（unguided）| 1.63 | 1.58 | 1.61 | **1.61 ± 0.02** | ≥ 1.3 → **確認（n=3）** |
+
+兩條都升級為 **evidential** 結論。1B 的 sd 0.02 異常緊 — 確定性採樣在 OOD 的損害是系統性的，不是 seed 運氣。
+Runs: `diag1A_{ddpm,fm}_none_bb4_s30{1,2}`、`diag1B_none_eta00_T1000_bb4_s30{1,2}`。
 
 ---
 
