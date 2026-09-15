@@ -1,0 +1,2 @@
+hpwl_pre_legalization,macro_legality_pre_legalization,idx,hpwl_normalized,hpwl_rescaled,macro_hpwl_normalized,macro_hpwl_rescaled,legality_2,macro_legality,original_hpwl_normalized,hpwl_ratio,model_time,generation_time,eval_time,model_vertices,model_edges,num_vertices,num_edges,lambda_2
+2343.48291015625,0.9481525512476263,6,226.2808837890625,3137.877685546875,226.2808837890625,3137.877685546875,0.9962057843062353,0.9962057843062353,413.13079833984375,0.5477221371497037,39.43279576301575,84.67066788673401,0.12103986740112305,1298,32900,1096812,5420096,0.0011938876

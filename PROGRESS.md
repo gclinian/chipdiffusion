@@ -52,8 +52,9 @@
   - [x] **4C DataAug Run C：avg7 45.171 vs Run X 44.649（+0.52）→ 關閉。** 兩個月前的孤兒 checkpoint 終於 eval。
 - [x] 12.3 `docs/plan/sampler_plan_1.md` **全部執行完畢**（2026-09-15 04:04，43 cells，零失敗）→
   `docs/report/sampler_report_1.md`、`docs/next/sampler_next_1.md`。
-- [ ] 12.4 **In progress**（使用者核准 09-15）：`scripts/run_phase4_seeds.sh` — Run X s301/302 → Run C 7 circ →
-  baseline + best-of-4 s303–305。預登記判定見 plan Phase 4。
+- [x] 12.4 Phase 4 完成（09-15 13:26）：4X Run X 關閉（+0.36 ± 1.35）、4C Run C 關閉（+0.52）、
+  **4B best-of-4 n=6 關閉（−0.70 ± 1.10，CI 含 0）**。**Step 12 全部結束：乾淨 stack 上零個正向方法結果。**
+- Status: **Done**
   - [x] 程式：`eta_scale` / `t_shift` sampler knobs（938e10e，39 行，defaults bit-identical）；
     best-of-N（e3ff934：`open_loop_multi` max_score bug 修正、`hpwl_pre_legalization` 永遠記錄、
     `+num_candidates=N +candidate_legality_floor=0.97 [+legalize_all_candidates=true]`）。

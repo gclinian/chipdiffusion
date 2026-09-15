@@ -6,8 +6,8 @@
 ## 一句話
 **在修好的 stack 上做同 stack 三 seed 配對檢定後，專案過去五個月的兩個標題主張（微調 −6~9%、
 inference-time search −4.4%）都消失了；它們是對一個壞掉的 baseline 比較出來的假象。**
-留下的正向結果只有：paper checkpoint 復現 45.99（贏已發表值 2%）、from-scratch Run X 44.65（n=1）、
-best-of-4 −3.3%（方向對、n=3 power 不足）。負向結果則非常乾淨，且多數已 n=3 evidential。
+Phase 4 補 seeds 後：Run X（+0.36 ± 1.35）與 best-of-4（−0.70 ± 1.10, n=6）也都未確立。
+**留下的正向結果只有 paper checkpoint 復現本身（45.99，贏已發表值 2%）。** 負向結果非常乾淨，多數 n≥3 evidential。
 
 ## 學到的（evidential，n≥3 或機制性）
 1. **Baseline 是所有比較的地基，而它可以壞掉五個月沒人發現。** 48.691 的原始目錄被 eval 碰撞覆蓋、
@@ -45,8 +45,9 @@ best-of-4 −3.3%（方向對、n=3 power 不足）。負向結果則非常乾�
 
 ## 剩餘方向（依價值排序；2026-09-15 Phase 4 後更新）
 1. ~~Run X 補 seeds~~ **已做，關閉**：paired Δ +0.36 ± 1.35，44.649 是 seed 300 假警報。
-2. **best-of-4 補 seeds 303–305** — 執行中（Phase 4B，n=6 配對 + 95% CI）。若成立，這是唯一可報告的
-   推論協定（附成本 4×、legality floor 0.97）；若不成立，本輪沒有任何正向方法結果。
+2. ~~best-of-4 補 seeds 303–305~~ **已做，關閉**：n=6 配對 −0.70 ± 1.10，CI [−1.85, +0.45]。
+   機制運作但增益在協定自身的 seed 雜訊內；4× 成本換解析不出的 −2%。
+   **→ 本輪沒有任何正向方法結果。**
 3. ~~DataAug Run C eval~~ **已做，關閉**：45.171 vs Run X 44.649（+0.52）。D4 對稱性在訓練端與推論端
    都不是瓶頸。
 4. bigblue2 with guidance on 32 GB（一次 eval，可能 OOM）— 唯一從未贏過 paper 的 circuit，也是唯一

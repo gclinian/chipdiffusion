@@ -1,13 +1,13 @@
 # STATUS — 自動產生，不要手改
 
-由 `python3 scripts/ledger.py status` 產生於 **2026-09-15 11:31**。
-來源：`docs/ledger/runs.jsonl`（208 runs）+ `docs/ledger/results/`（逐筆 metrics.csv 存檔）。
+由 `python3 scripts/ledger.py status` 產生於 **2026-09-15 13:28**。
+來源：`docs/ledger/runs.jsonl`（218 runs）+ `docs/ledger/results/`（逐筆 metrics.csv 存檔）。
 
-環境指紋：GPU `NVIDIA GeForce RTX 5090, 32607 MiB` ・ git `faceb42`（**working tree 有未 commit 變更**）
+環境指紋：GPU `NVIDIA GeForce RTX 5090, 32607 MiB` ・ git `550389c`（**working tree 有未 commit 變更**）
 
 ## Leaderboard（7-circuit avg HPWL，排除 bigblue2，越低越好）
 
-參考點：paper 已發表 **46.89** ・ 我們自己跑 paper checkpoint（`base_cu128_*`，現行 stack）：avg7 **45.987**（n=1） ・ avg6 [無 bigblue4] **31.238**（n=4, sd 0.666）
+參考點：paper 已發表 **46.89** ・ 我們自己跑 paper checkpoint（`base_cu128_*`，現行 stack）：avg7 **45.987**（n=1） ・ avg6 [無 bigblue4] **30.72**（n=6, sd 0.967）
 
 avg6 = 六個便宜 circuit（bigblue4 佔 eval 時間 78%，3-seed 協定只在 seed 300 跑它）。同 stack 的 2σ 雜訊帶 = 2 × avg6 sd；差距小於它的結果不算差距。
 
@@ -17,7 +17,12 @@ avg6 = 六個便宜 circuit（bigblue4 佔 eval 時間 78%，3-seed 協定只在
 
 | avg7 | avg6 | circuits | run group | seed | checkpoint |
 |-----:|-----:|---------:|-----------|------|------------|
+| — | 29.432 | 6 | `ispd2005-s0.base_cu128_s304.304` | 304 | `large-v2 (paper)` |
 | — | 29.646 | 6 | `ispd2005-s0.bon2c_s301.301` | 301 | `large-v2 (paper)` |
+| — | 29.708 | 6 | `ispd2005-s0.bon2c_s303.303` | 303 | `large-v2 (paper)` |
+| — | 29.916 | 6 | `ispd2005-s0.bon2c_s304.304` | 304 | `large-v2 (paper)` |
+| — | 29.933 | 6 | `ispd2005-s0.bon2c_s305.305` | 305 | `large-v2 (paper)` |
+| — | 29.937 | 6 | `ispd2005-s0.base_cu128_s305.305` | 305 | `large-v2 (paper)` |
 | 44.817 | 30.090 | 7 | `ispd2005-s0.bon2b_s300.300` | 300 | `large-v2 (paper)` |
 | — | 30.124 | 6 | `ispd2005-s0.bon2c_s300.300` | 300 | `large-v2 (paper)` |
 | — | 30.443 | 6 | `ispd2005-s0.base_cu128_s302.302` | 302 | `large-v2 (paper)` |
@@ -80,11 +85,16 @@ avg6 = 六個便宜 circuit（bigblue4 佔 eval 時間 78%，3-seed 協定只在
 - `ispd2005-s0.base_cu128_s301.301` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-14_
 - `ispd2005-s0.base_cu128_s302.302` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-14_
 - `ispd2005-s0.base_cu128_s303.303` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-15_
+- `ispd2005-s0.base_cu128_s304.304` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-15_
+- `ispd2005-s0.base_cu128_s305.305` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-15_
 - `ispd2005-s0.bon2b_s301.301` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-14_
 - `ispd2005-s0.bon2b_s302.302` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-14_
 - `ispd2005-s0.bon2c_s300.300` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-15_
 - `ispd2005-s0.bon2c_s301.301` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-15_
 - `ispd2005-s0.bon2c_s302.302` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-15_
+- `ispd2005-s0.bon2c_s303.303` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-15_
+- `ispd2005-s0.bon2c_s304.304` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-15_
+- `ispd2005-s0.bon2c_s305.305` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-15_
 - `ispd2005-s0.runF_cu128_s301.301` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-14_
 - `ispd2005-s0.runF_cu128_s302.302` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-14_
 - `ispd2005-s0.runX_cu128_s301.301` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-15_
@@ -137,8 +147,7 @@ avg6 = 六個便宜 circuit（bigblue4 佔 eval 時間 78%，3-seed 協定只在
 
 以 avg7 數值比對（2/3 位小數）而非目錄名，因為文件裡引用結果用的是方法名不是路徑。
 
-- `ispd2005-s0.base_cu128_s303.303` avg6=31.313　_2026-09-15_
-- `ispd2005-s0.runC_cu128_s300.300` avg7=45.171　_2026-09-15_
+- 無
 
 ## 判讀規則（同時明文寫在 CLAUDE.md，工具關掉也有效）
 

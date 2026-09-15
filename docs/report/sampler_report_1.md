@@ -22,7 +22,8 @@
 - ✅ 1A / 1B evidential（n=3）：FM/DDPM 2.22 ± 0.20；η=0/η=1 1.61 ± 0.02。
 - ❌ 4X Run X 3 seeds：paired Δ **+0.36 ± 1.35** → 44.649 是 n=1 假警報，關閉。**四種 checkpoint 全在同一 avg6 帶內。**
 - ❌ 4C DataAug Run C：avg7 45.171 vs Run X 44.649（+0.52）→ 關閉；D4 對稱性（訓練端+推論端）皆非瓶頸。
-- ⏳ 4B best-of-4 n=6（~13:30）。
+- ❌ 4B best-of-4 n=6：**−0.70 ± 1.10，CI [−1.85, +0.45]** → 未確立，關閉。
+- **總結：乾淨 stack 上零個正向方法結果；負向結果乾淨且多數 evidential。**
 
 ---
 
@@ -294,7 +295,42 @@ augmentation 與推論端 frame averaging（3H）一起說明：**D4 對稱性�
 Run B（僅 dihedral）從未重跑，故無法歸因 dropout；既然合併效應為零，歸因問題不再重要。
 Runs: `runC_cu128_s300_part{1,2}`。
 
-### 4B best-of-4 + baseline seeds 303–305（n=6 配對）⏳
+### 4B best-of-4（全 legalize）+ baseline，seeds 300–305 ✅ — **n=6 未確立，關閉**
+| seed | baseline avg6 | best-of-4 avg6 | Δ | 逐 circuit Δ |
+|---|---:|---:|---:|---|
+| 300 | 32.064 | 30.124 | −1.939 | a1 +1, a2 −1, a3 −4, a4 −7, bb1 0, **bb3 −14** |
+| 301 | 31.130 | 29.646 | −1.484 | a1 +1, **a2 −13**, a3 0, a4 −8, bb1 +1, bb3 0 |
+| 302 | 30.443 | 30.810 | +0.367 | a1 −1, a2 −6, a3 −3, a4 +7, bb1 −4, bb3 +7 |
+| 303 | 31.313 | 29.708 | −1.605 | a1 −9, **a2 −14**, a3 −4, a4 +4, bb1 −5, **bb3 −10** |
+| 304 | 29.432 | 29.916 | +0.484 | a1 +5, **a2 +12**, a3 0, a4 −1, bb1 −6, bb3 0 |
+| 305 | 29.937 | 29.933 | −0.005 | a1 −4, a2 +3, a3 0, a4 −3, bb1 −8, bb3 +4 |
+| **paired n=6** | | | **−0.697 ± 1.095；95% CI [−1.85, +0.45]；t = −1.56** | 同號：否（3 負 / 3 零或正）|
+
+**預登記判定**（mean ≤ −1.0 且 CI 不含 0 → 可報告）：**未達 → 關閉**。
+機制面：36 個 cell、選中的候選均勻分佈 [7, 11, 7, 11]、平均 3.75/4 過 legality floor、cell 內候選
+spread 8.4%（中位 6.7%）— 搜尋如設計運作。但 min-of-4 只買到每個 circuit 分佈的 ~1σ，而那個分佈本身
+跨 seed 就有 ±5–14% 的擺動（a2、bb3 在六個 seed 裡正負都出現），所以 avg6 上的淨增益 ~0.7、
+要 n ≈ 20 才能在 2σ 解析。**成本 4× sampling + 4× legalization，換一個解析不出來的 −2%：不值得作為
+協定報告。** 若日後 seed 數夠多可重開，但本輪關閉。Runs: `bon2c_s{300..305}_*`、`base_cu128_s{303,304,305}_*`。
+
+### 本輪總結：在乾淨 stack 上，沒有任何正向方法結果存活
+| 軸 | 測試 | n | Δ（avg6 或 ratio）| 判定 |
+|---|---|---:|---|---|
+| 微調（supervised 10k）| Run F vs paper ckpt | 3 配對 | +0.00 ± 0.80 | null |
+| Inference-time search | SVDD_layered vs paper ckpt | 3 配對 | −0.18 ± 1.28 | null |
+| From-scratch 訓練 | Run X vs paper ckpt | 3 配對 | +0.36 ± 1.35 | null |
+| 訓練端 D4 augmentation | Run C vs Run X | 1 | +0.52 (avg7) | null |
+| Sampler 確定性 | η=0 vs η=1（unguided bb4）| 3 | ratio 1.61 ± 0.02 | **有害**（evidential）|
+| FM objective | FM vs DDPM（unguided bb4）| 3 | ratio 2.22 ± 0.20 | **有害**（evidential）|
+| 步數 | T=100 vs 1000 | 1 | bb4 +7~14% | 有害 |
+| Grid shift by V | 兩方向 | 1 | +5.72 / −0.33 | null/有害 |
+| Guidance 深度 | K=60/150 | 1 | −2.3% ~ +15% | null/有害 |
+| 權重平均 | 兩 window vs Run X | 1 | +0.9 / +1.85 | 有害 |
+| 推論端 D4 | frame averaging | 1 | −0.4% / +2.4% | null |
+| Best-of-4 | 全 legalize vs baseline | 6 配對 | −0.70，CI 含 0 | 未確立 |
+
+**四種 checkpoint 來源與所有 sampler 變體都落在 paper checkpoint + opt guidance + legalizer 的雜訊帶內。**
+留下的正向事實只有復現本身（45.99，贏已發表值 2%）。
 
 ---
 
