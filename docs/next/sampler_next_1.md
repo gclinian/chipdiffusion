@@ -43,16 +43,20 @@ best-of-4 −3.3%（方向對、n=3 power 不足）。負向結果則非常乾�
 - 不做 hierarchical / scale conditioning（前提「quality 隨 V 退化」為假；repo 無 macro clustering）
 - 不做 attention temperature、AR-hybrid（mask 通道死碼）、MultiDiffusion、RePaint 式 refinement
 
-## 剩餘方向（依價值排序）
-1. **Run X（from-scratch 500k）補 seeds 301/302**（~25 min）。44.649 是本輪最佳 avg7、比 paper ckpt
-   好 1.34（n=1）。若 3 seed 配對仍 ≤ −1.3，它是專案第一個站得住的正向方法結果 — 而且不用 paper ckpt。
-2. **best-of-4 補 seeds 303–305**（~1.5 h）。Δ −1.02 ± 1.22，方向對；n=6 可在 2σ 解析 1.0。
-   若成立，這是唯一可報告的推論協定（附成本 4×、legality floor 0.97）。
-3. **DataAug Run C eval**（~25 min，seed 300）— 兩個月前訓練完從未 eval；3H 說推論端等變性沒用，
-   訓練端 augmentation 的先驗降低，但它是零成本的既成 checkpoint。
-4. bigblue2 with guidance on 32 GB（一次 eval，可能 OOM）— 唯一從未贏過 paper 的 circuit。
+## 剩餘方向（依價值排序；2026-09-15 Phase 4 後更新）
+1. ~~Run X 補 seeds~~ **已做，關閉**：paired Δ +0.36 ± 1.35，44.649 是 seed 300 假警報。
+2. **best-of-4 補 seeds 303–305** — 執行中（Phase 4B，n=6 配對 + 95% CI）。若成立，這是唯一可報告的
+   推論協定（附成本 4×、legality floor 0.97）；若不成立，本輪沒有任何正向方法結果。
+3. ~~DataAug Run C eval~~ **已做，關閉**：45.171 vs Run X 44.649（+0.52）。D4 對稱性在訓練端與推論端
+   都不是瓶頸。
+4. bigblue2 with guidance on 32 GB（一次 eval，可能 OOM）— 唯一從未贏過 paper 的 circuit，也是唯一
+   還沒在乾淨 stack 上測過的東西。
 5. 論文框架改寫：reproducibility + 乾淨負向結果（三個獨立實驗證明 auxiliary loss 冗餘；FM/deterministic
-   在 size-OOD 崩潰 n=3；fine-tuning 與 search 在同 stack 皆 null）+ Run X + best-of-N（若成立）。
+   在 size-OOD 崩潰 n=3；fine-tuning、search、from-scratch、augmentation 在同 stack 皆與 paper ckpt
+   無差別 — **pipeline 品質由 guidance + legalizer 決定，model 來源幾乎無關**）+ best-of-N（若 4B 成立）。
+6. 若 4B 也不成立：下一個值得問的問題不再是「哪個 model」，而是 **guidance / legalizer 本身**
+   （57 個 guided run 從沒動過 `grad_descent_rate`、`alpha_critical_factor`、`legality_potential_target`；
+   3E 只掃了 K）。
 
 ## 對 plan 的修正建議（下輪）
 - 判定門檻標明**量測階段**（pre-/post-legalization）與**指標**（avg6/avg7）。
