@@ -47,7 +47,8 @@
   - [x] **3E 關閉**（deep-K 最佳 −2.3% n=1；K=150 +7~15%）；**3F 關閉**（post-hoc 平均兩 window 皆更差）；
     **3H 關閉**（frame averaging −0.4% / +2.4%）。
   - [x] **1A / 1B evidential (n=3)**：FM/DDPM 2.22 ± 0.20；η=0/η=1 1.61 ± 0.02。
-  - ⚑ **Run X（from-scratch 500k）同 stack avg7 44.649 — 本輪最佳，比 paper ckpt 好 1.34（n=1）。未預登記。**
+  - [x] **4X Run X seeds 301/302：paired Δavg6 +0.36 ± 1.35 (t=0.46)，同號否 → 44.649 是 n=1 假警報，關閉。**
+    paper / 微調 / from-scratch / SVDD 四種來源全落在同一 avg6 帶（~31.2 ± 0.8）。
 - [x] 12.3 `docs/plan/sampler_plan_1.md` **全部執行完畢**（2026-09-15 04:04，43 cells，零失敗）→
   `docs/report/sampler_report_1.md`、`docs/next/sampler_next_1.md`。
 - [ ] 12.4 **In progress**（使用者核准 09-15）：`scripts/run_phase4_seeds.sh` — Run X s301/302 → Run C 7 circ →

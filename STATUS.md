@@ -1,9 +1,9 @@
 # STATUS — 自動產生，不要手改
 
-由 `python3 scripts/ledger.py status` 產生於 **2026-09-15 10:19**。
-來源：`docs/ledger/runs.jsonl`（200 runs）+ `docs/ledger/results/`（逐筆 metrics.csv 存檔）。
+由 `python3 scripts/ledger.py status` 產生於 **2026-09-15 11:01**。
+來源：`docs/ledger/runs.jsonl`（205 runs）+ `docs/ledger/results/`（逐筆 metrics.csv 存檔）。
 
-環境指紋：GPU `NVIDIA GeForce RTX 5090, 32607 MiB` ・ git `5b22680`（**working tree 有未 commit 變更**）
+環境指紋：GPU `NVIDIA GeForce RTX 5090, 32607 MiB` ・ git `08d45ac`（**working tree 有未 commit 變更**）
 
 ## Leaderboard（7-circuit avg HPWL，排除 bigblue2，越低越好）
 
@@ -23,6 +23,7 @@ avg6 = 六個便宜 circuit（bigblue4 佔 eval 時間 78%，3-seed 協定只在
 | — | 30.443 | 6 | `ispd2005-s0.base_cu128_s302.302` | 302 | `large-v2 (paper)` |
 | — | 30.473 | 6 | `ispd2005-s0.svdd_cu128_s302.302` | 302 | `large-v2 (paper)` |
 | 44.166 | 30.521 | 7 | `ispd2005-s0.svdd_cu128_s300.300` | 300 | `large-v2 (paper)` |
+| — | 30.757 | 6 | `ispd2005-s0.runX_cu128_s302.302` | 302 | `v1.61-fs.61.fs_p1_X_500k.61/latest.ckpt` |
 | — | 30.810 | 6 | `ispd2005-s0.bon2c_s302.302` | 302 | `large-v2 (paper)` |
 | 44.649 | 31.094 | 7 | `ispd2005-s0.runX_cu128_s300.300` | 300 | `v1.61-fs.61.fs_p1_X_500k.61/latest.ckpt` |
 | — | 31.130 | 6 | `ispd2005-s0.base_cu128_s301.301` | 301 | `large-v2 (paper)` |
@@ -36,6 +37,7 @@ avg6 = 六個便宜 circuit（bigblue4 佔 eval 時間 78%，3-seed 協定只在
 | 45.987 | 32.064 | 7 | `ispd2005-s0.base_cu128_s300.300` | 300 | `large-v2 (paper)` |
 | — | 32.117 | 6 | `ispd2005-s0.svdd_cu128_s301.301` | 301 | `large-v2 (paper)` |
 | 45.656 | 32.754 | 7 | `ispd2005-s0.diag1C_tshift_inv.300` | 300 | `large-v2 (paper)` |
+| — | 32.851 | 6 | `ispd2005-s0.runX_cu128_s301.301` | 301 | `v1.61-fs.61.fs_p1_X_500k.61/latest.ckpt` |
 | — | 33.794 | 6 | `ispd2005-s0.bon2b_s301.301` | 301 | `large-v2 (paper)` |
 
 ### 舊 stack（2026-09-13 之前，torch 2.2.1 / 24 GB 卡）— 只能彼此比較，**不可與上表比較**
@@ -82,8 +84,11 @@ avg6 = 六個便宜 circuit（bigblue4 佔 eval 時間 78%，3-seed 協定只在
 - `ispd2005-s0.bon2c_s302.302` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-15_
 - `ispd2005-s0.runF_cu128_s301.301` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-14_
 - `ispd2005-s0.runF_cu128_s302.302` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-14_
+- `ispd2005-s0.runX_cu128_s301.301` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-15_
+- `ispd2005-s0.runX_cu128_s302.302` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-15_
 - `ispd2005-s0.svdd_cu128_s301.301` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-14_
 - `ispd2005-s0.svdd_cu128_s302.302` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-14_
+- `ispd2005-s0.runC_cu128_s300.300` — 5/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1)　_2026-09-15_
 - `ispd2005-s0.bon2a_legall.300` — 1/7 (bigblue4)　_2026-09-14_
 - `ispd2005-s0.deepK150_acf05.300` — 1/7 (bigblue4)　_2026-09-14_
 - `ispd2005-s0.deepK150_acf10.300` — 1/7 (bigblue4)　_2026-09-14_
@@ -107,7 +112,6 @@ avg6 = 六個便宜 circuit（bigblue4 佔 eval 時間 78%，3-seed 協定只在
 
 ## ⚠ 未收割：訓練完成但從未 eval 的 checkpoint
 
-- `v1.61-fs.61.aug_p1_C_dihedral_dropout_500k.61`　_2026-07-08_
 - `v1.61-fs.61.aug_p1_ctrl.61`　_2026-07-08_
 - `v1.61-fs.61.aug_p1_pilot2.61`　_2026-07-08_　（pilot，可能不需要）
 - `v1.61-fs.61.aug_p1_pilot.61`　_2026-07-08_　（pilot，可能不需要）

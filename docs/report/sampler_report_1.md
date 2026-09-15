@@ -20,7 +20,7 @@
 - ❌ 3E deep-K：最佳 −2.3%（n=1），K=150 +7~15% → 關閉。 ❌ 3F post-hoc 平均：兩 window 都更差 → 關閉。
   ❌ 3H frame averaging：a1 −0.4% / bb4 +2.4% → 關閉。
 - ✅ 1A / 1B evidential（n=3）：FM/DDPM 2.22 ± 0.20；η=0/η=1 1.61 ± 0.02。
-- ⚑ **意外發現：Run X（from-scratch 500k）同 stack avg7 44.649，本輪最佳，比 paper ckpt 好 1.34（n=1）。**
+- ❌ 4X Run X 3 seeds：paired Δ **+0.36 ± 1.35** → 44.649 是 n=1 假警報，關閉。**四種 checkpoint 全在同一 avg6 帶內。**
 
 ---
 
@@ -264,7 +264,21 @@ Runs: `diag1A_{ddpm,fm}_none_bb4_s30{1,2}`、`diag1B_none_eta00_T1000_bb4_s30{1,
 
 ---
 
-## 附錄：流程事故
+## Phase 4 — 收尾 seeds（2026-09-15，預登記見 plan Phase 4）
+
+### 4X Run X（from-scratch 500k）seeds 300–302 ✅ — **n=1 假警報，關閉**
+| seed | baseline avg6 | Run X avg6 | Δ | 逐 circuit Δ |
+|---|---:|---:|---:|---|
+| 300 | 32.064 | 31.094 | −0.969 | a1 +4%, a2 −6%, a3 +6%, a4 −12%, bb1 +2%, bb3 −3% |
+| 301 | 31.130 | 32.851 | **+1.721** | a1 +1%, **a2 +19%**, a3 +11%, a4 −1%, bb1 +7%, bb3 −5% |
+| 302 | 30.443 | 30.757 | +0.314 | a1 0%, a2 0%, a3 +2%, a4 +5%, bb1 −2%, bb3 −4% |
+| **paired** | | | **+0.355 ± 1.346（t=0.46, 95% CI [−2.99, +3.70]）** | 同號：否 |
+
+**預登記判定**（≤ −1.3 且同號）：**FAIL** → 44.649 是 seed 300 的假警報，記錄並關閉。
+Run X 與 paper checkpoint 統計上無差別（也與 Run F、SVDD 無差別）— 在乾淨 stack 上，
+**四個不同來源的 checkpoint / sampler（paper、微調、from-scratch、SVDD）全部落在同一個 ~31.2 ± 0.8 的
+avg6 帶內**。這本身是本輪最強的單一結論：目前這條 pipeline 的品質由 opt guidance + legalizer 決定，
+model 來源幾乎不影響。Runs: `runX_cu128_s{300,301,302}_*`。
 三個 ad-hoc 背景 waiter 用 `pgrep -f <pattern>` 等前一批，pattern 出現在自己的 cmdline 裡 →
 一個永久死鎖（1A 從未啟動）、兩個提早觸發並同時搶 GPU（`diag1B_opt_eta00_T1000_a1` 與
 `bon2a_legall_a1` 同時跑，timing 受污染但 HPWL 有效）。修正：佇列改為 `scripts/run_sampler_plan_1.sh`
