@@ -21,6 +21,8 @@
   ❌ 3H frame averaging：a1 −0.4% / bb4 +2.4% → 關閉。
 - ✅ 1A / 1B evidential（n=3）：FM/DDPM 2.22 ± 0.20；η=0/η=1 1.61 ± 0.02。
 - ❌ 4X Run X 3 seeds：paired Δ **+0.36 ± 1.35** → 44.649 是 n=1 假警報，關閉。**四種 checkpoint 全在同一 avg6 帶內。**
+- ❌ 4C DataAug Run C：avg7 45.171 vs Run X 44.649（+0.52）→ 關閉；D4 對稱性（訓練端+推論端）皆非瓶頸。
+- ⏳ 4B best-of-4 n=6（~13:30）。
 
 ---
 
@@ -279,6 +281,24 @@ Run X 與 paper checkpoint 統計上無差別（也與 Run F、SVDD 無差別）
 **四個不同來源的 checkpoint / sampler（paper、微調、from-scratch、SVDD）全部落在同一個 ~31.2 ± 0.8 的
 avg6 帶內**。這本身是本輪最強的單一結論：目前這條 pipeline 的品質由 opt guidance + legalizer 決定，
 model 來源幾乎不影響。Runs: `runX_cu128_s{300,301,302}_*`。
+### 4C DataAug Run C（dihedral + edge_dropout 0.1，from-scratch 500k）seed 300 ✅ — **關閉**
+| | adaptec1 | adaptec2 | adaptec3 | adaptec4 | bigblue1 | bigblue3 | bigblue4 | avg7 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Run C | 9.88 | 28.37 | 55.55 | 57.13 | 2.62 | 33.86 | 128.77 | **45.171** |
+| Run X（同 stack，同預算無 augmentation）| 9.41 | 28.77 | 59.62 | 50.58 | 2.67 | 35.52 | 125.98 | 44.649 |
+| Δ | +5% | -1% | -7% | +13% | -2% | -5% | +2% | +0.522 |
+
+**預登記判定**（≤ −1.3 → 補 seeds）：**FAIL** → DataAug 方向關閉。這個 checkpoint 2026-07-08 訓練完後
+擱置兩個月才 eval；結果與 Run X 無差別（且 Run X 本身與 baseline 無差別，見 4X）。訓練端 D4
+augmentation 與推論端 frame averaging（3H）一起說明：**D4 對稱性不是這條 pipeline 的瓶頸**。
+Run B（僅 dihedral）從未重跑，故無法歸因 dropout；既然合併效應為零，歸因問題不再重要。
+Runs: `runC_cu128_s300_part{1,2}`。
+
+### 4B best-of-4 + baseline seeds 303–305（n=6 配對）⏳
+
+---
+
+## 附錄：流程事故
 三個 ad-hoc 背景 waiter 用 `pgrep -f <pattern>` 等前一批，pattern 出現在自己的 cmdline 裡 →
 一個永久死鎖（1A 從未啟動）、兩個提早觸發並同時搶 GPU（`diag1B_opt_eta00_T1000_a1` 與
 `bon2a_legall_a1` 同時跑，timing 受污染但 HPWL 有效）。修正：佇列改為 `scripts/run_sampler_plan_1.sh`
