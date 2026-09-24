@@ -179,7 +179,7 @@ re-noise 無法收縮它）；DDPM-IP / offset noise；FlowPlace 硬投影（該
 | ChipDiffusion（paper）| diffusion | 31.27 | 唯一在完整 bigblue4 (8170) 報數的生成式方法 |
 | 我們（新 stack baseline, n=1）| diffusion | ~32.1 | adaptec1 9.03 / adaptec2 30.75 |
 | **OrderPlace**（ICML 2026, 2606.08904）| wire-mask + LLM 演化 | **29.98**（5 seeds）| adaptec1 **5.75**、bigblue1 **2.00**；bb2/bb4 只放 1024 個 module |
-| EGPlace（ICML 2025）| wire-mask + 演化 | 相近 | 同上限制 |
+| EGPlace（ICML 2025）| wire-mask + 演化 | 35.7（**輸** ChipDiffusion）| 數字取自 OrderPlace Table 2 同協定重跑；同上限制。2026-09-25 校正：原本寫「相近」是錯的 |
 | MacroDiff+（IJCAI 2026）| diffusion + deep guidance | 不可比（mixed-size）| in-distribution 訓練 |
 | FlowPlace（DAC 2026）| flow matching | 不可比（ICCAD2015）| 未評 ISPD2005 |
 | DiffPlace（2510.15897）| diffusion + CFG | — | CFG 半部與已關閉的 AddLoss 同構 |

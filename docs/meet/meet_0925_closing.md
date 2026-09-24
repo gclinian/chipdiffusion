@@ -68,16 +68,20 @@ best-of-4 挑最好的（六個種子平均只好 0.7，在雜訊內，成本四
 
 2025–26 在 ISPD2005 上有進展的，全是**構造式搜尋**（wire-mask：macro 依序放，每一步選讓 HPWL 增加最少的格子），
 外面套演化或 LLM 來搜擺放順序（EGPlace ICML'25、OrderPlace ICML'26）。**沒有生成模型。**
+下表數字我對過 OrderPlace 原文 Table 2（×10⁵，5 個種子平均，1000 分鐘時限）；原論文與我們的欄位來自 ChipDiffusion Table 10 和我們的復現。
 
-| | 原論文 | 我們復現 | OrderPlace |
-|---|---:|---:|---:|
-| adaptec1（543 macros）| 9.19 | 9.03 | **5.75** |
-| bigblue1（560）| 2.64 | 2.63 | **2.00** |
-| 六個 circuit 平均 | 31.27 | 32.06 | **29.98**（−4%）|
-| bigblue4（8,170）| 141 | 129.5 | **沒跑**（只放 1024 個）|
+| | ChipDiffusion（原論文）| 我們復現 | EGPlace | OrderPlace |
+|---|---:|---:|---:|---:|
+| adaptec1（543 macros）| 9.19 | 9.03 | 5.72 | **5.75** |
+| bigblue1（560）| 2.64 | 2.63 | 2.20 | **2.00** |
+| 六個 circuit 平均 | 31.27 | 32.06 | 35.7（輸）| **29.98**（−4%）|
+| bigblue4（8,170）| 141 | 129.5 | 沒跑 | 沒跑 |
 
-搜尋方法在小 circuit 上大贏（−24% ~ −37%），中型持平，大 circuit 沒人跟 diffusion 比 — 但也沒人在比。
-diffusion 這條線在這個 benchmark 上的競爭位置：小的輸、大的沒對手也沒觀眾。
+- 只有 OrderPlace 在六 circuit 平均上贏 diffusion，而且贏的部分幾乎全在兩個最小的 circuit（−24% ~ −37%）；
+  中型三個持平或略輸。EGPlace 整體還輸 diffusion。
+- bigblue2 / bigblue4 他們沒有完整跑：原文寫「由於 macro 數量太多，我們依 EGPlace 的設定選 1024 個 macro」。
+  所以大 circuit 上沒有人跟 diffusion 比 — 但也沒人在比。
+- diffusion 這條線在這個 benchmark 上的位置：小的輸給搜尋、大的沒對手也沒觀眾。
 
 ---
 
