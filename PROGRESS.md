@@ -59,6 +59,8 @@
 - [x] 12.6 結案文件 `docs/meet/meet_0925_closing.md`（白話、可不看稿講）。三面向審查（數字核對 24 條 / 教授模擬 10 題 / 可讀性 26 條）
   後重寫：修正 FM「2.2×」重複計算、「六個方向全做完」過度宣稱、Run X 推論 EDA 的邏輯漏洞、6/7-circuit 混用、
   OrderPlace 表改用六種子平均。領域數字對過 OrderPlace 原文 Table 2。
+- [ ] 12.7 結案前實驗 Phase 5（使用者核准 09-25）— **In progress**：5A 超參數篩選 11 組（seed 300）→ 5B bigblue2 開 guidance →
+  5A stage 2（通過者補 seeds）。`scripts/run_phase5_AB.sh`，預登記見 plan Phase 5。
   - [x] 程式：`eta_scale` / `t_shift` sampler knobs（938e10e，39 行，defaults bit-identical）；
     best-of-N（e3ff934：`open_loop_multi` max_score bug 修正、`hpwl_pre_legalization` 永遠記錄、
     `+num_candidates=N +candidate_legality_floor=0.97 [+legalize_all_candidates=true]`）。

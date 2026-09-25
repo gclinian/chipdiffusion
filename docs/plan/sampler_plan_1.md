@@ -108,3 +108,21 @@ GPU 閒置；序列 ~3 h。全部 eval-only。
 ### 4B best-of-4（全 legalize）+ baseline，seeds 303/304/305，6 便宜 circuit
 - 與 2c 合併成 n=6 配對。**判定**：mean Δavg6 ≤ −1.0 且 95% CI（t, df=5）不含 0 → 可報告的協定
   （報 effect ± CI、成本 4×、legality floor 0.97）；mean ≤ −1.3 → strong；否則關閉。
+
+## Phase 5 — 結案前的兩個實驗（2026-09-25 追加，預登記，使用者核准）
+對應 `docs/meet/meet_0925_closing.md` §七 A、B。全部 eval-only，large-v2 + opt + opt-adam，新環境。
+### 5A guidance / legalizer 超參數（「品質由這層決定」的直接檢驗）
+- 掃的是 57+ 個 guided run 從沒動過的參數，一次動一個、兩個方向（paper 預設值為中心）：
+  `model.grad_descent_rate` 8e-3 → 4e-3 / 16e-3；`model.hpwl_guidance_weight` 16e-4 → 8e-4 / 32e-4；
+  `model.alpha_critical_factor` 0.5 → 1.0（K=20 下未測過）；`model.legality_potential_target` 1e-4 → 0 / 1e-3；
+  `legalization.hpwl_weight` 12e-5 → 6e-5 / 24e-5；`legalization.alpha_lr` 8e-3 → 4e-3 / 16e-3。共 11 組。
+- **Stage 1 篩選**：seed 300、6 便宜 circuit（~13 min/組）。通過條件：avg6 ≤ 0.95 × baseline_s300（32.064）= **≤ 30.46**
+  且 macro_legality 全部 ≥ 0.93（不能用犧牲合法度換 HPWL）。
+- **Stage 2**：通過者補 seeds 301/302。**判定**（文件已寫）：三種子配對 Δavg6 ≤ −5%（≈ −1.55）且三個同號 → 成立；
+  否則關閉。任何成立的結果都要標明「paper 的預設值是為 ISPD2005 調的，這是測試集上調參」。
+- 預期：多數在雜訊內；若全部不通過篩選，主張一（品質由這層決定）的「反向檢驗」為 null — 代表預設值已在平坦區，
+  這與「model 不重要」並不矛盾但也不直接支持它；報告要誠實寫。
+### 5B bigblue2 開 guidance（32.6 GB）
+- 一次 eval：idx 5，seed 300，不設 `skip_guidance_threshold`。可能 OOM（舊估 30–35 GB）。
+- **判定**：跑得完 → 記錄 HPWL 與 legality，復現表補成 8/8，對照 paper 38.8；OOM → 記錄峰值記憶體，
+  下一步是把 guidance 路徑改走已存在的 tiled legality potential（不在本輪）。
