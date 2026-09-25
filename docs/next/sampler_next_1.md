@@ -7,7 +7,8 @@
 **在修好的 stack 上做同 stack 三 seed 配對檢定後，專案過去五個月的兩個標題主張（微調 −6~9%、
 inference-time search −4.4%）都消失了；它們是對一個壞掉的 baseline 比較出來的假象。**
 Phase 4 補 seeds 後：Run X（+0.36 ± 1.35）與 best-of-4（−0.70 ± 1.10, n=6）也都未確立。
-**留下的正向結果只有 paper checkpoint 復現本身（45.99，贏已發表值 2%）。** 負向結果非常乾淨，多數 n≥3 evidential。
+Phase 5 後修正：**model / sampler 層零個正向結果；legalizer 層一個（hpwl_weight ×2，−7.0%，n=3，校準性質）；bigblue2 開
+guidance 後復現 8/8（39.7 vs 38.8）。** 負向結果非常乾淨，多數 n≥3 evidential。
 
 ## 學到的（evidential，n≥3 或機制性）
 1. **Baseline 是所有比較的地基，而它可以壞掉五個月沒人發現。** 48.691 的原始目錄被 eval 碰撞覆蓋、
@@ -55,9 +56,11 @@ Phase 4 補 seeds 後：Run X（+0.36 ± 1.35）與 best-of-4（−0.70 ± 1.10,
 5. 論文框架改寫：reproducibility + 乾淨負向結果（三個獨立實驗證明 auxiliary loss 冗餘；FM/deterministic
    在 size-OOD 崩潰 n=3；fine-tuning、search、from-scratch、augmentation 在同 stack 皆與 paper ckpt
    無差別 — **pipeline 品質由 guidance + legalizer 決定，model 來源幾乎無關**）+ best-of-N（若 4B 成立）。
-6. 若 4B 也不成立：下一個值得問的問題不再是「哪個 model」，而是 **guidance / legalizer 本身**
-   （57 個 guided run 從沒動過 `grad_descent_rate`、`alpha_critical_factor`、`legality_potential_target`；
-   3E 只掃了 K）。
+6. ~~若 4B 也不成立：下一個值得問的問題是 guidance / legalizer 本身~~ **已做（Phase 5A，2026-09-25/26）**：
+   11 個參數各動一次，唯一成立的是 `legalization.hpwl_weight` 12e-5 → 24e-5：三 seed 配對 **−2.19 ± 0.72（−7.0%）**，
+   同號，CI [−4.0, −0.4]，legality 未掉。其餘 10 組 null。**整輪唯一會動數字的旋鈕在 legalizer** — 主張「品質由
+   guidance + legalizer 決定」的直接證據。性質是校準（paper 的值本來就是在 ISPD2005 上調的），不是方法。
+7. **bigblue2 開 guidance（Phase 5B）**：32.6 GB 放得下，2 h，**39.72 / legality 1.000**（paper 38.8）。復現 8/8。
 
 ## 對 plan 的修正建議（下輪）
 - 判定門檻標明**量測階段**（pre-/post-legalization）與**指標**（avg6/avg7）。
