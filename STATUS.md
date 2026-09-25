@@ -1,9 +1,9 @@
 # STATUS — 自動產生，不要手改
 
-由 `python3 scripts/ledger.py status` 產生於 **2026-09-26 00:13**。
-來源：`docs/ledger/runs.jsonl`（241 runs）+ `docs/ledger/results/`（逐筆 metrics.csv 存檔）。
+由 `python3 scripts/ledger.py status` 產生於 **2026-09-26 00:50**。
+來源：`docs/ledger/runs.jsonl`（249 runs）+ `docs/ledger/results/`（逐筆 metrics.csv 存檔）。
 
-環境指紋：GPU `NVIDIA GeForce RTX 5090, 32607 MiB` ・ git `a971056`（**working tree 有未 commit 變更**）
+環境指紋：GPU `NVIDIA GeForce RTX 5090, 32607 MiB` ・ git `bad26ae`（**working tree 有未 commit 變更**）
 
 ## Leaderboard（7-circuit avg HPWL，排除 bigblue2，越低越好）
 
@@ -17,6 +17,8 @@ avg6 = 六個便宜 circuit（bigblue4 佔 eval 時間 78%，3-seed 協定只在
 
 | avg7 | avg6 | circuits | run group | seed | checkpoint |
 |-----:|-----:|---------:|-----------|------|------------|
+| — | 28.316 | 6 | `ispd2005-s0.hp_lhw_24e5.301` | 301 | `large-v2 (paper)` |
+| — | 29.048 | 6 | `ispd2005-s0.hp_lhw_24e5.302` | 302 | `large-v2 (paper)` |
 | — | 29.432 | 6 | `ispd2005-s0.base_cu128_s304.304` | 304 | `large-v2 (paper)` |
 | — | 29.646 | 6 | `ispd2005-s0.bon2c_s301.301` | 301 | `large-v2 (paper)` |
 | — | 29.691 | 6 | `ispd2005-s0.hp_lhw_24e5.300` | 300 | `large-v2 (paper)` |
@@ -26,6 +28,7 @@ avg6 = 六個便宜 circuit（bigblue4 佔 eval 時間 78%，3-seed 協定只在
 | — | 29.937 | 6 | `ispd2005-s0.base_cu128_s305.305` | 305 | `large-v2 (paper)` |
 | 44.817 | 30.090 | 7 | `ispd2005-s0.bon2b_s300.300` | 300 | `large-v2 (paper)` |
 | — | 30.124 | 6 | `ispd2005-s0.bon2c_s300.300` | 300 | `large-v2 (paper)` |
+| — | 30.130 | 6 | `ispd2005-s0.hp_lal_4e3.302` | 302 | `large-v2 (paper)` |
 | — | 30.443 | 6 | `ispd2005-s0.base_cu128_s302.302` | 302 | `large-v2 (paper)` |
 | — | 30.473 | 6 | `ispd2005-s0.svdd_cu128_s302.302` | 302 | `large-v2 (paper)` |
 | — | 30.500 | 6 | `ispd2005-s0.hp_lal_4e3.300` | 300 | `large-v2 (paper)` |
@@ -50,6 +53,7 @@ avg6 = 六個便宜 circuit（bigblue4 佔 eval 時間 78%，3-seed 協定只在
 | — | 31.650 | 6 | `ispd2005-s0.bon2b_s302.302` | 302 | `large-v2 (paper)` |
 | — | 31.889 | 6 | `ispd2005-s0.hp_acf_10.300` | 300 | `large-v2 (paper)` |
 | — | 31.936 | 6 | `ispd2005-s0.hp_hgw_8e4.300` | 300 | `large-v2 (paper)` |
+| — | 31.980 | 6 | `ispd2005-s0.hp_lal_4e3.301` | 301 | `large-v2 (paper)` |
 | 45.987 | 32.064 | 7 | `ispd2005-s0.base_cu128_s300.300` | 300 | `large-v2 (paper)` |
 | — | 32.117 | 6 | `ispd2005-s0.svdd_cu128_s301.301` | 301 | `large-v2 (paper)` |
 | — | 32.530 | 6 | `ispd2005-s0.hp_lal_16e3.300` | 300 | `large-v2 (paper)` |
@@ -113,7 +117,11 @@ avg6 = 六個便宜 circuit（bigblue4 佔 eval 時間 78%，3-seed 協定只在
 - `ispd2005-s0.hp_hgw_8e4.300` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-25_
 - `ispd2005-s0.hp_lal_16e3.300` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-25_
 - `ispd2005-s0.hp_lal_4e3.300` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-25_
+- `ispd2005-s0.hp_lal_4e3.301` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-26_
+- `ispd2005-s0.hp_lal_4e3.302` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-26_
 - `ispd2005-s0.hp_lhw_24e5.300` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-25_
+- `ispd2005-s0.hp_lhw_24e5.301` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-26_
+- `ispd2005-s0.hp_lhw_24e5.302` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-26_
 - `ispd2005-s0.hp_lhw_6e5.300` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-25_
 - `ispd2005-s0.hp_lpt_0.300` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-25_
 - `ispd2005-s0.hp_lpt_1e3.300` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-25_
@@ -169,7 +177,9 @@ avg6 = 六個便宜 circuit（bigblue4 佔 eval 時間 78%，3-seed 協定只在
 
 以 avg7 數值比對（2/3 位小數）而非目錄名，因為文件裡引用結果用的是方法名不是路徑。
 
-- 無
+- `ispd2005-s0.hp_lhw_24e5.301` avg6=28.316　_2026-09-26_
+- `ispd2005-s0.hp_lal_4e3.302` avg6=30.130　_2026-09-26_
+- `ispd2005-s0.hp_lal_4e3.301` avg6=31.980　_2026-09-26_
 
 ## 判讀規則（同時明文寫在 CLAUDE.md，工具關掉也有效）
 

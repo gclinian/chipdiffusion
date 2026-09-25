@@ -23,7 +23,9 @@
 - ❌ 4X Run X 3 seeds：paired Δ **+0.36 ± 1.35** → 44.649 是 n=1 假警報，關閉。**四種 checkpoint 全在同一 avg6 帶內。**
 - ❌ 4C DataAug Run C：avg7 45.171 vs Run X 44.649（+0.52）→ 關閉；D4 對稱性（訓練端+推論端）皆非瓶頸。
 - ✅ **5B bigblue2 開 guidance：39.72（paper 38.8，+2.4%，單 seed 雜訊內）→ 復現 8/8；六個月的「輸 50%」是 24 GB 限制。**
-- ⚖ 5A 篩選：11 組 1 過（`lhw_24e5` −7.4% @ seed 300）；stage 2 seeds 301/302 跑中。
+- ✅ **5A：`lhw_24e5`（legalizer hpwl_weight ×2）三 seed 配對 −2.19 ± 0.72（−7.0%），同號，CI 不含 0 → 成立。**
+  乾淨 stack 上唯一成立的正向結果，且在 legalizer 層 — 主張一的直接證據。其餘 10 組（含 lal_4e3 stage 2）null。
+- **總結修正：不再是「零個正向結果」— 是「model / sampler 層零個，legalizer 層一個（校準性質）」。**
 - ❌ 4B best-of-4 n=6：**−0.70 ± 1.10，CI [−1.85, +0.45]** → 未確立，關閉。
 - **總結：乾淨 stack 上零個正向方法結果；負向結果乾淨且多數 evidential。**
 
@@ -332,7 +334,7 @@ spread 8.4%（中位 6.7%）— 搜尋如設計運作。但 min-of-4 只買到�
 | Best-of-4 | 全 legalize vs baseline | 6 配對 | −0.70，CI 含 0 | 未確立 |
 
 **四種 checkpoint 來源與所有 sampler 變體都落在 paper checkpoint + opt guidance + legalizer 的雜訊帶內。**
-留下的正向事實只有復現本身（45.99，贏已發表值 2%）。
+（Phase 5 後更新）唯一能移動數字的是 legalizer 的 HPWL 權重（5A，−7.0%，n=3）；bigblue2 開 guidance 後復現 8/8。
 
 
 ## Phase 5 — 結案前的兩個實驗（2026-09-25/26，預登記見 plan Phase 5）
@@ -349,7 +351,7 @@ spread 8.4%（中位 6.7%）— 搜尋如設計運作。但 min-of-4 只買到�
 = 45.20 vs paper 發表的 8-circuit 45.88（−1.5%）。復現至此 8/8 都在 paper 的雜訊帶內。
 峰值記憶體未量測（下次跑加 `nvidia-smi` 取樣）。Run: `bb2_guided_s300`。
 
-### 5A guidance / legalizer 超參數篩選（seed 300，6 便宜 circuit）✅ stage 1；⏳ stage 2
+### 5A guidance / legalizer 超參數篩選（seed 300，6 便宜 circuit）✅ stage 1 ✅ stage 2
 | config | 改了什麼 | avg6 | Δ vs baseline s300 (32.064) | min legality | 篩選 |
 |---|---|---:|---:|---:|---|
 | lhw_24e5 | legalization.hpwl_weight 12e-5 → 24e-5 | **29.69** | **−7.4%** | 0.936（adaptec2；baseline 0.942）| **PASS** |
@@ -367,6 +369,21 @@ spread 8.4%（中位 6.7%）— 搜尋如設計運作。但 min-of-4 只買到�
 lhw_24e5 的增益集中在 adaptec4 −15%、adaptec3 −8%（legality 0.996 / 0.992，不是用合法度換的）。
 兩個 legalizer 的旋鈕（hpwl_weight ↑、alpha_lr ↓）方向一致：都是讓 legalizer 更偏向拉 HPWL、慢一點壓合法度。
 22 cells 零失敗。Runs: `hp_<config>_{part1,bb3}`。
+
+**Stage 2（seeds 301/302 配對，判定：三 seed 配對 ≤ −5% 且同號）**
+| config | seed 300 | 301 | 302 | paired Δavg6 | 判定 |
+|---|---:|---:|---:|---|---|
+| **lhw_24e5**（legalizer hpwl_weight ×2）| −7.4% | −9.0% | −4.6% | **−2.19 ± 0.72（−7.0%），t = -5.2，95% CI [-4.00, -0.38]** | **成立** |
+| lal_4e3（legalizer alpha_lr ×0.5）| −4.9% | +2.7% | −1.0% | −0.34 ± 1.4（−1.1%），不同號 | 未確立 |
+
+lhw_24e5 逐 circuit（三 seed 平均）：adaptec2 −10%、adaptec4 −11%、adaptec3 −5%、bigblue3 −3%、bigblue1 −2%、adaptec1 +1%。
+legality：adaptec2 0.94–0.95（baseline 0.94–0.98），其餘 ≥ 0.98 — **不是用合法度換的**。
+**這是整個專案在乾淨 stack 上第一個成立的正向結果，而且它動的是 legalizer（生成完之後的 20,000 步梯度下降），
+不是 model、不是 sampler。** 這正是主張一（品質由 guidance + legalizer 決定）的直接檢驗：反向動這一層，數字跟著動了。
+必須標明：paper 的 12e-5 是為 ISPD2005 調的，我們的 24e-5 是在同一個測試集上再調一步 — 這是 **校準發現**，不是方法貢獻；
+它說明的是「原論文的 legalizer 把 HPWL 留在桌上」，而不是「我們有更好的方法」。
+未做（可做的後續）：更大的 hpwl_weight（48e-5）、與 lal_4e3 合併、bigblue4 / bigblue2 上的確認（bigblue4 seed 300 已排一個 cell）。
+Runs: `hp_lhw_24e5_*`, `hp_lal_4e3_*`（seeds 300–302）。
 
 ---
 
