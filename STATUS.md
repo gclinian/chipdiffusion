@@ -1,9 +1,9 @@
 # STATUS — 自動產生，不要手改
 
-由 `python3 scripts/ledger.py status` 產生於 **2026-09-26 00:50**。
-來源：`docs/ledger/runs.jsonl`（249 runs）+ `docs/ledger/results/`（逐筆 metrics.csv 存檔）。
+由 `python3 scripts/ledger.py status` 產生於 **2026-09-26 01:09**。
+來源：`docs/ledger/runs.jsonl`（250 runs）+ `docs/ledger/results/`（逐筆 metrics.csv 存檔）。
 
-環境指紋：GPU `NVIDIA GeForce RTX 5090, 32607 MiB` ・ git `bad26ae`（**working tree 有未 commit 變更**）
+環境指紋：GPU `NVIDIA GeForce RTX 5090, 32607 MiB` ・ git `05afee5`（**working tree 有未 commit 變更**）
 
 ## Leaderboard（7-circuit avg HPWL，排除 bigblue2，越低越好）
 
@@ -21,7 +21,7 @@ avg6 = 六個便宜 circuit（bigblue4 佔 eval 時間 78%，3-seed 協定只在
 | — | 29.048 | 6 | `ispd2005-s0.hp_lhw_24e5.302` | 302 | `large-v2 (paper)` |
 | — | 29.432 | 6 | `ispd2005-s0.base_cu128_s304.304` | 304 | `large-v2 (paper)` |
 | — | 29.646 | 6 | `ispd2005-s0.bon2c_s301.301` | 301 | `large-v2 (paper)` |
-| — | 29.691 | 6 | `ispd2005-s0.hp_lhw_24e5.300` | 300 | `large-v2 (paper)` |
+| 43.547 | 29.691 | 7 | `ispd2005-s0.hp_lhw_24e5.300` | 300 | `large-v2 (paper)` |
 | — | 29.708 | 6 | `ispd2005-s0.bon2c_s303.303` | 303 | `large-v2 (paper)` |
 | — | 29.916 | 6 | `ispd2005-s0.bon2c_s304.304` | 304 | `large-v2 (paper)` |
 | — | 29.933 | 6 | `ispd2005-s0.bon2c_s305.305` | 305 | `large-v2 (paper)` |
@@ -119,7 +119,6 @@ avg6 = 六個便宜 circuit（bigblue4 佔 eval 時間 78%，3-seed 協定只在
 - `ispd2005-s0.hp_lal_4e3.300` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-25_
 - `ispd2005-s0.hp_lal_4e3.301` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-26_
 - `ispd2005-s0.hp_lal_4e3.302` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-26_
-- `ispd2005-s0.hp_lhw_24e5.300` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-25_
 - `ispd2005-s0.hp_lhw_24e5.301` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-26_
 - `ispd2005-s0.hp_lhw_24e5.302` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-26_
 - `ispd2005-s0.hp_lhw_6e5.300` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-25_

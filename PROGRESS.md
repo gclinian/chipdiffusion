@@ -66,7 +66,7 @@
   - [x] **5B bigblue2 開 guidance：39.72 / legality 1.000，2 h，無 OOM。paper 38.8（+2.4%，單 seed 雜訊內）。復現 8/8。**
   - [x] **5A stage 2：`lhw_24e5` 成立**（三 seed 配對 −2.19 ± 0.72 = −7.0%，同號，t≈−5.3，CI [−4.0, −0.4]，legality 未掉）；
     `lal_4e3` 未確立（不同號）。乾淨 stack 上第一個成立的正向結果，在 legalizer 層 → 主張一的直接證據；標為校準非方法。
-  - [ ] 附加（非預登記）：lhw_24e5 bigblue4 seed 300 一個 cell，讓 7-circuit 數字存在 — queued
+  - [x] 附加（非預登記）：lhw_24e5 bigblue4 = 126.68（-2.2%）；7-circuit avg seed 300 = **43.547**（-5.3% vs 45.987；paper 46.89）
 - Status: **Done**（12.7 主體完成）
   - [x] 程式：`eta_scale` / `t_shift` sampler knobs（938e10e，39 行，defaults bit-identical）；
     best-of-N（e3ff934：`open_loop_multi` max_score bug 修正、`hpwl_pre_legalization` 永遠記錄、

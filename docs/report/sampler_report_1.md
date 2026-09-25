@@ -382,7 +382,9 @@ legality：adaptec2 0.94–0.95（baseline 0.94–0.98），其餘 ≥ 0.98 — 
 不是 model、不是 sampler。** 這正是主張一（品質由 guidance + legalizer 決定）的直接檢驗：反向動這一層，數字跟著動了。
 必須標明：paper 的 12e-5 是為 ISPD2005 調的，我們的 24e-5 是在同一個測試集上再調一步 — 這是 **校準發現**，不是方法貢獻；
 它說明的是「原論文的 legalizer 把 HPWL 留在桌上」，而不是「我們有更好的方法」。
-未做（可做的後續）：更大的 hpwl_weight（48e-5）、與 lal_4e3 合併、bigblue4 / bigblue2 上的確認（bigblue4 seed 300 已排一個 cell）。
+bigblue4 確認（post-hoc，非預登記，seed 300）：lhw_24e5 **126.68**（legality 0.975）vs baseline 129.53 → -2.2%。
+7-circuit avg（seed 300）：**43.547** vs baseline 45.987（-5.3%）；paper 46.89。加 bigblue2（39.72，未用新權重）8-circuit ≈ 43.07 vs paper 45.88。
+未做（可做的後續）：更大的 hpwl_weight（48e-5）、與 lal_4e3 合併、bigblue2 用新權重重跑（2 h）。
 Runs: `hp_lhw_24e5_*`, `hp_lal_4e3_*`（seeds 300–302）。
 
 ---
