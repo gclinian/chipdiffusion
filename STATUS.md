@@ -1,9 +1,9 @@
 # STATUS — 自動產生，不要手改
 
-由 `python3 scripts/ledger.py status` 產生於 **2026-09-15 13:28**。
-來源：`docs/ledger/runs.jsonl`（218 runs）+ `docs/ledger/results/`（逐筆 metrics.csv 存檔）。
+由 `python3 scripts/ledger.py status` 產生於 **2026-09-26 00:13**。
+來源：`docs/ledger/runs.jsonl`（241 runs）+ `docs/ledger/results/`（逐筆 metrics.csv 存檔）。
 
-環境指紋：GPU `NVIDIA GeForce RTX 5090, 32607 MiB` ・ git `550389c`（**working tree 有未 commit 變更**）
+環境指紋：GPU `NVIDIA GeForce RTX 5090, 32607 MiB` ・ git `a971056`（**working tree 有未 commit 變更**）
 
 ## Leaderboard（7-circuit avg HPWL，排除 bigblue2，越低越好）
 
@@ -19,6 +19,7 @@ avg6 = 六個便宜 circuit（bigblue4 佔 eval 時間 78%，3-seed 協定只在
 |-----:|-----:|---------:|-----------|------|------------|
 | — | 29.432 | 6 | `ispd2005-s0.base_cu128_s304.304` | 304 | `large-v2 (paper)` |
 | — | 29.646 | 6 | `ispd2005-s0.bon2c_s301.301` | 301 | `large-v2 (paper)` |
+| — | 29.691 | 6 | `ispd2005-s0.hp_lhw_24e5.300` | 300 | `large-v2 (paper)` |
 | — | 29.708 | 6 | `ispd2005-s0.bon2c_s303.303` | 303 | `large-v2 (paper)` |
 | — | 29.916 | 6 | `ispd2005-s0.bon2c_s304.304` | 304 | `large-v2 (paper)` |
 | — | 29.933 | 6 | `ispd2005-s0.bon2c_s305.305` | 305 | `large-v2 (paper)` |
@@ -27,9 +28,12 @@ avg6 = 六個便宜 circuit（bigblue4 佔 eval 時間 78%，3-seed 協定只在
 | — | 30.124 | 6 | `ispd2005-s0.bon2c_s300.300` | 300 | `large-v2 (paper)` |
 | — | 30.443 | 6 | `ispd2005-s0.base_cu128_s302.302` | 302 | `large-v2 (paper)` |
 | — | 30.473 | 6 | `ispd2005-s0.svdd_cu128_s302.302` | 302 | `large-v2 (paper)` |
+| — | 30.500 | 6 | `ispd2005-s0.hp_lal_4e3.300` | 300 | `large-v2 (paper)` |
 | 44.166 | 30.521 | 7 | `ispd2005-s0.svdd_cu128_s300.300` | 300 | `large-v2 (paper)` |
 | — | 30.757 | 6 | `ispd2005-s0.runX_cu128_s302.302` | 302 | `v1.61-fs.61.fs_p1_X_500k.61/latest.ckpt` |
+| — | 30.791 | 6 | `ispd2005-s0.hp_gdr_16e3.300` | 300 | `large-v2 (paper)` |
 | — | 30.810 | 6 | `ispd2005-s0.bon2c_s302.302` | 302 | `large-v2 (paper)` |
+| — | 30.963 | 6 | `ispd2005-s0.hp_lpt_1e3.300` | 300 | `large-v2 (paper)` |
 | 44.649 | 31.094 | 7 | `ispd2005-s0.runX_cu128_s300.300` | 300 | `v1.61-fs.61.fs_p1_X_500k.61/latest.ckpt` |
 | — | 31.130 | 6 | `ispd2005-s0.base_cu128_s301.301` | 301 | `large-v2 (paper)` |
 | — | 31.131 | 6 | `ispd2005-s0.runF_cu128_s302.302` | 302 | `v1.61-ddpo.ablation_supervised_10k.61/latest.ckpt` |
@@ -38,11 +42,18 @@ avg6 = 六個便宜 circuit（bigblue4 佔 eval 時間 78%，3-seed 協定只在
 | 45.171 | 31.237 | 7 | `ispd2005-s0.runC_cu128_s300.300` | 300 | `v1.61-fs.61.aug_p1_C_dihedral_dropout_500k.61/latest.ckpt` |
 | — | 31.313 | 6 | `ispd2005-s0.base_cu128_s303.303` | 303 | `large-v2 (paper)` |
 | — | 31.327 | 6 | `ispd2005-s0.runF_cu128_s301.301` | 301 | `v1.61-ddpo.ablation_supervised_10k.61/latest.ckpt` |
+| — | 31.398 | 6 | `ispd2005-s0.hp_hgw_32e4.300` | 300 | `large-v2 (paper)` |
+| — | 31.509 | 6 | `ispd2005-s0.hp_lpt_0.300` | 300 | `large-v2 (paper)` |
+| — | 31.519 | 6 | `ispd2005-s0.hp_gdr_4e3.300` | 300 | `large-v2 (paper)` |
 | 45.569 | 31.607 | 7 | `ispd2005-s0.runXavg_400k_500k.300` | 300 | `v1.61-fs.61.fs_p1_X_500k.61/avg_400k_500k_uniform.ckpt` |
 | 46.497 | 31.612 | 7 | `ispd2005-s0.runXavg_250k_500k.300` | 300 | `v1.61-fs.61.fs_p1_X_500k.61/avg_250k_500k_uniform.ckpt` |
 | — | 31.650 | 6 | `ispd2005-s0.bon2b_s302.302` | 302 | `large-v2 (paper)` |
+| — | 31.889 | 6 | `ispd2005-s0.hp_acf_10.300` | 300 | `large-v2 (paper)` |
+| — | 31.936 | 6 | `ispd2005-s0.hp_hgw_8e4.300` | 300 | `large-v2 (paper)` |
 | 45.987 | 32.064 | 7 | `ispd2005-s0.base_cu128_s300.300` | 300 | `large-v2 (paper)` |
 | — | 32.117 | 6 | `ispd2005-s0.svdd_cu128_s301.301` | 301 | `large-v2 (paper)` |
+| — | 32.530 | 6 | `ispd2005-s0.hp_lal_16e3.300` | 300 | `large-v2 (paper)` |
+| — | 32.633 | 6 | `ispd2005-s0.hp_lhw_6e5.300` | 300 | `large-v2 (paper)` |
 | 45.656 | 32.754 | 7 | `ispd2005-s0.diag1C_tshift_inv.300` | 300 | `large-v2 (paper)` |
 | — | 32.851 | 6 | `ispd2005-s0.runX_cu128_s301.301` | 301 | `v1.61-fs.61.fs_p1_X_500k.61/latest.ckpt` |
 | — | 33.794 | 6 | `ispd2005-s0.bon2b_s301.301` | 301 | `large-v2 (paper)` |
@@ -95,6 +106,17 @@ avg6 = 六個便宜 circuit（bigblue4 佔 eval 時間 78%，3-seed 協定只在
 - `ispd2005-s0.bon2c_s303.303` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-15_
 - `ispd2005-s0.bon2c_s304.304` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-15_
 - `ispd2005-s0.bon2c_s305.305` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-15_
+- `ispd2005-s0.hp_acf_10.300` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-25_
+- `ispd2005-s0.hp_gdr_16e3.300` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-25_
+- `ispd2005-s0.hp_gdr_4e3.300` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-25_
+- `ispd2005-s0.hp_hgw_32e4.300` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-25_
+- `ispd2005-s0.hp_hgw_8e4.300` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-25_
+- `ispd2005-s0.hp_lal_16e3.300` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-25_
+- `ispd2005-s0.hp_lal_4e3.300` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-25_
+- `ispd2005-s0.hp_lhw_24e5.300` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-25_
+- `ispd2005-s0.hp_lhw_6e5.300` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-25_
+- `ispd2005-s0.hp_lpt_0.300` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-25_
+- `ispd2005-s0.hp_lpt_1e3.300` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-25_
 - `ispd2005-s0.runF_cu128_s301.301` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-14_
 - `ispd2005-s0.runF_cu128_s302.302` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-14_
 - `ispd2005-s0.runX_cu128_s301.301` — 6/7 (adaptec1,adaptec2,adaptec3,adaptec4,bigblue1,bigblue3)　_2026-09-15_

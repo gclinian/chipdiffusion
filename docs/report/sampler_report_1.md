@@ -22,6 +22,8 @@
 - ✅ 1A / 1B evidential（n=3）：FM/DDPM 2.22 ± 0.20；η=0/η=1 1.61 ± 0.02。
 - ❌ 4X Run X 3 seeds：paired Δ **+0.36 ± 1.35** → 44.649 是 n=1 假警報，關閉。**四種 checkpoint 全在同一 avg6 帶內。**
 - ❌ 4C DataAug Run C：avg7 45.171 vs Run X 44.649（+0.52）→ 關閉；D4 對稱性（訓練端+推論端）皆非瓶頸。
+- ✅ **5B bigblue2 開 guidance：39.72（paper 38.8，+2.4%，單 seed 雜訊內）→ 復現 8/8；六個月的「輸 50%」是 24 GB 限制。**
+- ⚖ 5A 篩選：11 組 1 過（`lhw_24e5` −7.4% @ seed 300）；stage 2 seeds 301/302 跑中。
 - ❌ 4B best-of-4 n=6：**−0.70 ± 1.10，CI [−1.85, +0.45]** → 未確立，關閉。
 - **總結：乾淨 stack 上零個正向方法結果；負向結果乾淨且多數 evidential。**
 
@@ -331,6 +333,40 @@ spread 8.4%（中位 6.7%）— 搜尋如設計運作。但 min-of-4 只買到�
 
 **四種 checkpoint 來源與所有 sampler 變體都落在 paper checkpoint + opt guidance + legalizer 的雜訊帶內。**
 留下的正向事實只有復現本身（45.99，贏已發表值 2%）。
+
+
+## Phase 5 — 結案前的兩個實驗（2026-09-25/26，預登記見 plan Phase 5）
+
+### 5B bigblue2 開 guidance（32.6 GB）✅ — **跑得完；復現補成 8/8**
+| | bigblue2 HPWL | legality | 備註 |
+|---|---:|---:|---|
+| 舊環境，無 guidance（4 seeds）| 56.9 – 65.5 | ~1.00 | 24 GB 放不下 V×V |
+| **新環境，開 guidance（seed 300）** | **39.72** | **1.000** | generation 7,178 s（含 20 步 guidance × 1000），無 OOM |
+| paper（seed 400）| 38.8 | — | |
+
+**預登記判定**：跑得完 → 記錄。39.72 vs 38.8 = +2.4%，在單 seed 雜訊內（paper 是另一個 seed）。
+**結論：bigblue2「輸 paper 50%」六個月來完全是 24 GB 硬體限制，不是方法問題。** 8-circuit 平均（seed 300）
+= 45.20 vs paper 發表的 8-circuit 45.88（−1.5%）。復現至此 8/8 都在 paper 的雜訊帶內。
+峰值記憶體未量測（下次跑加 `nvidia-smi` 取樣）。Run: `bb2_guided_s300`。
+
+### 5A guidance / legalizer 超參數篩選（seed 300，6 便宜 circuit）✅ stage 1；⏳ stage 2
+| config | 改了什麼 | avg6 | Δ vs baseline s300 (32.064) | min legality | 篩選 |
+|---|---|---:|---:|---:|---|
+| lhw_24e5 | legalization.hpwl_weight 12e-5 → 24e-5 | **29.69** | **−7.4%** | 0.936（adaptec2；baseline 0.942）| **PASS** |
+| lal_4e3 | legalization.alpha_lr 8e-3 → 4e-3 | 30.50 | −4.9% | 0.973 | 差 0.04 未過；依 next_1「n=1 ≥1.3 自動補 seed」規則進 stage 2 |
+| gdr_16e3 | model.grad_descent_rate 8e-3 → 16e-3 | 30.79 | −4.0% | 0.974 | — |
+| lpt_1e3 | model.legality_potential_target 1e-4 → 1e-3 | 30.96 | −3.4% | 0.955 | — |
+| hgw_32e4 | model.hpwl_guidance_weight 16e-4 → 32e-4 | 31.40 | −2.1% | 0.978 | — |
+| gdr_4e3 / lpt_0 | ×0.5 / 0 | 31.52 / 31.51 | −1.7% | 0.967 / 0.976 | — |
+| acf_10 / hgw_8e4 | acf 1.0 / hgw ×0.5 | 31.89 / 31.94 | −0.5% / −0.4% | 0.969 / 0.926 | — |
+| lal_16e3 / lhw_6e5 | ×2 / ×0.5 | 32.53 / 32.63 | +1.5% / +1.8% | 0.973 / 0.985 | — |
+
+篩選規則（預登記）：avg6 ≤ 0.95 × 32.064 = 30.46 且各 circuit legality ≥ 0.93。11 組裡 1 組通過。
+注意：seed 300 是六個 baseline seed 裡最差的（avg6 32.06 vs 六 seed 平均 30.72），單 seed 的 −7.4% 有一部分是
+回歸均值；**stage 2（seeds 301/302 配對）才算數**，判定門檻：三 seed 配對 ≤ −5% 且同號。
+lhw_24e5 的增益集中在 adaptec4 −15%、adaptec3 −8%（legality 0.996 / 0.992，不是用合法度換的）。
+兩個 legalizer 的旋鈕（hpwl_weight ↑、alpha_lr ↓）方向一致：都是讓 legalizer 更偏向拉 HPWL、慢一點壓合法度。
+22 cells 零失敗。Runs: `hp_<config>_{part1,bb3}`。
 
 ---
 

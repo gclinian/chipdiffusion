@@ -63,7 +63,7 @@
   - [x] 5A stage 1 篩選（11 組 × seed 300，22 cells 零失敗）：**通過 1 組 `lhw_24e5`**（legalization.hpwl_weight 12e-5→24e-5）
     avg6 29.69（−7.4%），min legality 0.936；近似 `lal_4e3` −4.9%（差 0.04 未過線，但符合 next_1「n=1 ≥1.3 自動補 seed」規則）。
     其餘 9 組 −4.0% ~ +1.8%，全在雜訊內。注意 seed 300 是六個 baseline seed 裡最差的，stage 2 配對才算數。
-  - [ ] 5B bigblue2 開 guidance — running（22:11 起）
+  - [x] **5B bigblue2 開 guidance：39.72 / legality 1.000，2 h，無 OOM。paper 38.8（+2.4%，單 seed 雜訊內）。復現 8/8。**
   - [ ] 5A stage 2：`lhw_24e5`、`lal_4e3` seeds 301/302（`run_phase5A_stage2.sh`，排在 5B 後）
   - [x] 程式：`eta_scale` / `t_shift` sampler knobs（938e10e，39 行，defaults bit-identical）；
     best-of-N（e3ff934：`open_loop_multi` max_score bug 修正、`hpwl_pre_legalization` 永遠記錄、

@@ -133,8 +133,8 @@ CLAUDE.md 只放不會變的規則與 gotchas。
   - From a saved run: `from_checkpoint=v1.61-ddpo.<method>.61/latest.ckpt`
   - From pretrained: `from_checkpoint=../public-models/large-v2/large-v2.ckpt`
   - **Always verify** the eval log contains "successfully loaded state dict for model" — if it says "no checkpoint at ... found", the path is wrong.
-- **bigblue2 (23k macros)**: Guidance V×V matrix OOMed on the OLD 24GB card (re-measure on 32.6 GB). Set `+skip_guidance_threshold=10000` to auto-skip guidance for this circuit. **Legalization itself does NOT OOM** (takes ~100 min though). bigblue2 still loses to paper (HPWL 57-66 vs paper 38.8) because we have no guidance.
-- **Guidance OOM on large circuits**: Circuits with >~10k macros OOMed on guidance (V×V matrix) on the OLD 24GB card. Use `+skip_guidance_threshold=10000` and `macros_only=True`.
+- **bigblue2 (23k macros)**: Guidance V×V OOMed on the OLD 24GB card. **On the 32.6 GB RTX 5090 it fits: full opt guidance runs in ~2 h and gives HPWL 39.72 / legality 1.000 (2026-09-26, seed 300) vs paper 38.8** — the old 57-66 was purely the missing guidance. `+skip_guidance_threshold=10000` is now only needed if you want the cheap no-guidance run; omit it for real results.
+- **Guidance OOM on large circuits**: only an issue on ≤24 GB cards; on 32.6 GB even bigblue2 (23k) fits (see above).
 - **generate_parallel.py num_workers**: Default is 64, which can OOM and kill SSH. Use fewer workers (e.g., 4) or use `generate.py` for single-process.
 - **`placements/macro-ispd/`**: These results are from the **paper authors** (checkpoint `v2_gmix1.6_2x...ckpt`), NOT from our runs. They match paper Table 10 exactly.
 - **System CPU contention** (NAS server): Other users (ansys.e, redhawk+) can crater eval speed 5-13x. Check `uptime` and `top` if eval seems abnormally slow. The GPU may show 11% util but actual compute is CPU-bound.
@@ -152,12 +152,11 @@ CLAUDE.md 只放不會變的規則與 gotchas。
 | 2   | adaptec3 | 723    | ✓         | ✓             |
 | 3   | adaptec4 | 1,329  | ✓         | ✓             |
 | 4   | bigblue1 | 560    | ✓         | ✓             |
-| 5   | bigblue2 | 23,084 | ✗ OOM (V×V) | ✓ (~100 min)  |
+| 5   | bigblue2 | 23,084 | ✓ on 32.6 GB (~2 h) | ✓             |
 | 6   | bigblue3 | 1,298  | ✓         | ✓             |
 | 7   | bigblue4 | 8,170  | ✓         | ✓ (~25 min)   |
 
-For bigblue2: use `+skip_guidance_threshold=10000` to auto-disable guidance.
-Without paper-style guidance, HPWL stays ~57-66 vs paper's 38.8.
+bigblue2 with guidance (32.6 GB): 39.72 vs paper 38.8. Without guidance: 57-66.
 
 ### Baseline ISPD2005 Results (large-v2.ckpt, seed=300, HPWL x10^5)
 | Circuit | Baseline | Paper | Note |
@@ -167,7 +166,7 @@ Without paper-style guidance, HPWL stays ~57-66 vs paper's 38.8.
 | adaptec3 | 62.14 | 54.4 | |
 | adaptec4 | 60.51 | 54.5 | |
 | bigblue1 | 2.69 | 2.64 | very close |
-| bigblue2 | skip | 38.8 | guidance OOM on the OLD 24GB card |
+| bigblue2 | 39.72 (new stack, guided) | 38.8 | old card could not run guidance |
 | bigblue3 | 34.26 | 35.9 | beats paper |
 | bigblue4 | 131.96 | 140.6 | beats paper |
 | Avg (7, no bb2) | **48.69** | **46.89** | |
